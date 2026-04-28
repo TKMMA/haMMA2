@@ -43,6 +43,9 @@
   const FALLBACK_REGS_URL =
     'https://dlnr.hawaii.gov/dar/fishing/fishing-regulations/';
 
+  // Must match --duration-slow in style.css (400ms) + small buffer
+  const SHEET_TRANSITION_MS = 420;
+
   const MOBILE_BREAKPOINT = window.matchMedia('(max-width: 768px)');
 
   // ── FIELD SCHEMA ─────────────────────────────────────────────
@@ -106,6 +109,7 @@
   let mobileInfoHideTimer    = null;
   let hasEverSelected        = false;
   let isCompactMode          = false; // eslint-disable-line no-unused-vars
+  let activeLastLatlng       = null;  // last latlng used to open the info panel
 
 
   // ── 3. DOM REFERENCES ────────────────────────────────────────
@@ -280,6 +284,32 @@
   function setMobileVerticalState(isMinimized) {
     if (!isMobileView() || !paneStageEl) return;
     paneStageEl.classList.toggle('is-minimized', Boolean(isMinimized));
+  }
+
+  // Cycle the info pane through: half → full → dismissed
+  // Called by the resize button in the info panel header
+  function cycleInfoPaneState() {
+    if (!isMobileView() || !paneStageEl) return;
+
+    if (paneStageEl.classList.contains('is-expanded')) {
+      // Full → Half
+      paneStageEl.classList.remove('is-expanded');
+      updateInfoResizeBtn();
+      // Re-centre in the now-smaller visible strip
+      if (activeLastLatlng) {
+        setTimeout(() => flyToMobileVisibleCenter(activeLastLatlng), SHEET_TRANSITION_MS);
+      }
+    } else if (!paneStageEl.classList.contains('is-minimized')) {
+      // Half → Dismissed
+      clearMapSelection();
+    }
+  }
+
+  // Expand the info pane from half to full
+  function expandInfoPane() {
+    if (!isMobileView() || !paneStageEl) return;
+    paneStageEl.classList.add('is-expanded');
+    updateInfoResizeBtn();
   }
 
   function toggleMobileStageMinimized() {
@@ -506,6 +536,48 @@
       titleGridColumn:  '2',
       handleGridColumn: '3',
     });
+  }
+
+  // Update the resize button label to reflect the current sheet state
+  function updateInfoResizeBtn() {
+    const btn = document.getElementById('info-resize-btn');
+    if (!btn || !isMobileView()) return;
+
+    const isExpanded = paneStageEl?.classList.contains('is-expanded');
+    const icon  = btn.querySelector('.info-resize-btn__icon');
+    const label = btn.querySelector('.info-resize-btn__label');
+
+    if (isExpanded) {
+      if (icon)  icon.textContent  = '↓';
+      if (label) label.textContent = 'Less map';
+    } else {
+      if (icon)  icon.textContent  = '↑';
+      if (label) label.textContent = 'More info';
+    }
+  }
+
+  // Ensure the resize button exists inside the info sidebar
+  function ensureInfoResizeBtn() {
+    if (!isMobileView() || !infoSidebarEl) return;
+    if (document.getElementById('info-resize-btn')) return;
+
+    const btn       = document.createElement('button');
+    btn.id          = 'info-resize-btn';
+    btn.className   = 'info-resize-btn';
+    btn.type        = 'button';
+    btn.setAttribute('aria-label', 'Expand info panel');
+    btn.innerHTML   = `<span class="info-resize-btn__icon" aria-hidden="true">↑</span><span class="info-resize-btn__label">More info</span>`;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isExpanded = paneStageEl?.classList.contains('is-expanded');
+      if (isExpanded) {
+        cycleInfoPaneState(); // full → half
+      } else {
+        expandInfoPane();     // half → full
+      }
+    });
+
+    infoSidebarEl.appendChild(btn);
   }
 
   function updateInfoBannerTitle() {
@@ -835,7 +907,7 @@
     setActiveAreaItem(null, null);
 
     if (isMobileView()) {
-      paneStageEl?.classList.remove('is-info-view');
+      paneStageEl?.classList.remove('is-info-view', 'is-expanded');
       paneStageEl?.classList.add('is-minimized');
       setMobileHomeState({ hideInfoAfterTransition: true });
     } else {
@@ -919,38 +991,29 @@
       </div>`;
   }
 
-  function buildSummaryCard(features) {
+  // Build just the collapsible panel content — the trigger button now lives
+  // in the mmpopup header so it's always visible regardless of scroll position.
+  function buildSummaryPanel(features) {
     const stateRegsUrl =
       getVal(features[0].properties, 'State_Fishing_Regs_URL') || FALLBACK_REGS_URL;
 
     return `
-      <div class="summary-accordion">
-        <button
-          class="summary-accordion__toggle"
-          type="button"
-          aria-expanded="false"
-          data-action="toggle-summary"
-        >
-          <span class="summary-accordion__label">See consolidated fishing rules summary at this location</span>
-          <span class="summary-accordion__chevron" aria-hidden="true">▼</span>
-        </button>
-        <div class="summary-accordion__panel">
-          <div class="area-section mmcard mmcard--summary">
-            <div class="mmcard__body">
-              <h3 class="mmcard__title">Fishing Rules Summary</h3>
-              <span class="mmcard__subtitle-label">Managed areas at this location:</span>
-              <div class="mmcard__subtitle">${buildAreaNamesList(features)}</div>
-              <div class="mm-statewide-notice">
-                Reminder: All
-                <a href="${escapeHtml(stateRegsUrl)}" target="_blank" rel="noopener">Statewide Fishing Regulations</a>
-                still apply here.
-              </div>
-              <div class="mmtabs">
-                <button class="active" type="button">CONSOLIDATED RULES</button>
-              </div>
-              <div class="tab-pane summary-field-stack">
-                ${SUMMARY_SCHEMA.map((s) => buildSummaryBlock(s.title, s.fieldKey, features)).join('')}
-              </div>
+      <div class="summary-accordion__panel--inline" hidden>
+        <div class="area-section mmcard mmcard--summary" style="border-top-left-radius:0;border-top-right-radius:0;margin-bottom:0;">
+          <div class="mmcard__body">
+            <h3 class="mmcard__title">Fishing Rules Summary</h3>
+            <span class="mmcard__subtitle-label">Managed areas at this location:</span>
+            <div class="mmcard__subtitle">${buildAreaNamesList(features)}</div>
+            <div class="mm-statewide-notice">
+              Reminder: All
+              <a href="${escapeHtml(stateRegsUrl)}" target="_blank" rel="noopener">Statewide Fishing Regulations</a>
+              still apply here.
+            </div>
+            <div class="mmtabs">
+              <button class="active" type="button">CONSOLIDATED RULES</button>
+            </div>
+            <div class="tab-pane summary-field-stack">
+              ${SUMMARY_SCHEMA.map((s) => buildSummaryBlock(s.title, s.fieldKey, features)).join('')}
             </div>
           </div>
         </div>
@@ -1029,81 +1092,95 @@
   }
 
   function toggleSummaryAccordion(btn) {
-    const panel = btn?.closest('.summary-accordion');
-    if (!panel) return;
-    const expanded = panel.classList.toggle('expanded');
-    btn.setAttribute('aria-expanded', String(expanded));
-    const label = btn.querySelector('.summary-accordion__label');
+    // btn is the .mmpopup__header--toggle button
+    const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+    const nextState  = !isExpanded;
+    btn.setAttribute('aria-expanded', String(nextState));
+
+    // Find the inline panel — first sibling inside .mmpopup__scroll
+    const scroll = btn.closest('.mmpopup')?.querySelector('.mmpopup__scroll');
+    const panel  = scroll?.querySelector('.summary-accordion__panel--inline');
+    if (panel) panel.hidden = !nextState;
+
+    // Update label text
+    const label = btn.querySelector('.mmpopup__summary-trigger-label');
     if (label) {
-      label.textContent = expanded
+      label.textContent = nextState
         ? 'Hide consolidated fishing rules'
-        : 'See consolidated fishing rules summary at this location';
+        : 'See consolidated fishing rules summary';
     }
   }
 
-  function collapseSummaryAccordion(summaryEl) {
-    if (!summaryEl?.classList.contains('expanded')) return;
-    summaryEl.classList.remove('expanded');
-    const btn   = summaryEl.querySelector('.summary-accordion__toggle');
-    const label = btn?.querySelector('.summary-accordion__label');
-    if (btn)   btn.setAttribute('aria-expanded', 'false');
-    if (label) label.textContent = 'See consolidated fishing rules summary at this location';
-  }
+  // No-op kept for compatibility — panel is now always accessible via header
+  function collapseSummaryAccordion() {}
 
 
   // ── 15. INFO PANEL — OPEN / CLOSE ────────────────────────────
   function openInfoPanel(latlng, features, options = {}) {
-    const headerTitle = features.length === 1
-      ? '1 Area Selected'
-      : `${features.length} Areas Selected`;
+    // Store for re-centring after resize
+    activeLastLatlng = latlng || null;
 
-    const summaryHtml = features.length > 1 ? buildSummaryCard(features) : '';
-    const dividerHtml = features.length > 1
+    const isMulti     = features.length > 1;
+    const headerTitle = isMulti ? `${features.length} Areas Selected` : '1 Area Selected';
+    const cardsHtml   = features.map((f, i) => buildAreaCard(f, `area-${i}`)).join('');
+    const dividerHtml = isMulti
       ? '<div class="section-divider">Detailed area information below</div>'
       : '';
-    const cardsHtml = features.map((f, i) => buildAreaCard(f, `area-${i}`)).join('');
+
+    // Multi-area: header becomes the summary accordion trigger.
+    // Single area: plain centred label as before.
+    const headerHtml = isMulti
+      ? `<button
+           class="mmpopup__header--toggle"
+           type="button"
+           aria-expanded="false"
+           data-action="toggle-summary"
+         >
+           <div class="mmpopup__header-row">
+             <span class="mmpopup__header-title">${headerTitle}</span>
+           </div>
+           <div class="mmpopup__summary-trigger">
+             <span class="mmpopup__summary-trigger-label">See consolidated fishing rules summary</span>
+             <span class="mmpopup__summary-trigger-chevron" aria-hidden="true">▼</span>
+           </div>
+         </button>`
+      : `<div class="mmpopup__header-inner">
+           <span class="mmpopup__header-title">${headerTitle}</span>
+         </div>`;
+
+    // Summary panel is now just the card content (no outer accordion wrapper)
+    // — the trigger lives in the header above
+    const summaryPanelHtml = isMulti ? buildSummaryPanel(features) : '';
 
     infoContentEl.innerHTML = `
       <div class="mmpopup">
-        <div class="mmpopup__header">
-          <div class="mmpopup__header-title">${headerTitle}</div>
-        </div>
+        <div class="mmpopup__header">${headerHtml}</div>
         <div class="mmpopup__scroll">
-          ${summaryHtml}
+          ${summaryPanelHtml}
           ${dividerHtml}
           ${cardsHtml}
         </div>
       </div>`;
 
-    // Auto-collapse summary accordion when scrolled out of view
-    const scrollEl  = infoContentEl.querySelector('.mmpopup__scroll');
-    const summaryEl = infoContentEl.querySelector('.summary-accordion');
-    if (scrollEl) {
-      scrollEl.scrollTop = 0;
-      scrollEl.addEventListener('scroll', () => {
-        if (!summaryEl?.classList.contains('expanded')) return;
-        const sRect = summaryEl.getBoundingClientRect();
-        const cRect = scrollEl.getBoundingClientRect();
-        if (sRect.bottom <= cRect.top + 6) collapseSummaryAccordion(summaryEl);
-      }, { passive: true });
-    }
+    const scrollEl = infoContentEl.querySelector('.mmpopup__scroll');
+    if (scrollEl) scrollEl.scrollTop = 0;
 
     updateInfoBannerTitle();
 
     if (isMobileView()) {
-      paneStageEl?.classList.remove('is-minimized');
+      // Reset to half state whenever a new panel opens
+      paneStageEl?.classList.remove('is-minimized', 'is-expanded');
       paneStageEl?.classList.add('is-info-view');
       setMobileInfoPaneVisibility(true);
       setMapSidebarMobileState('open');
       setInfoSidebarState('open');
       setMobilePaneStage('info');
+      ensureInfoResizeBtn();
+      updateInfoResizeBtn();
 
-      // After the sheet finishes sliding up (400ms transition), centre the
-      // selected feature in the visible map strip above it.
-      // The 420ms delay gives the CSS transition time to fully settle so
-      // getBoundingClientRect() returns the final resting position.
+      // After sheet settles, centre feature in the visible strip above
       if (latlng) {
-        setTimeout(() => flyToMobileVisibleCenter(latlng), 420);
+        setTimeout(() => flyToMobileVisibleCenter(latlng), SHEET_TRANSITION_MS);
       }
     } else {
       setInfoSidebarState('expanded');
@@ -1250,16 +1327,27 @@
         getVal(layer.feature.properties, 'Full_name');
       if (name !== areaName) return;
 
-      const bounds          = layer.getBounds();
+      const bounds      = layer.getBounds();
+      const center      = bounds.getCenter();
+      const openPanel   = () => openInfoPanel(center, [layer.feature], { source: 'menu' });
+
+      map.stop();
+
+      // ── Mobile: open the panel immediately (sheet opens, then
+      //    openInfoPanel's setTimeout centres the polygon in the visible
+      //    strip above the settled sheet). No desktop-style flyToBounds.
+      if (isMobileView()) {
+        openPanel();
+        flashLayerBorder(layer);
+        return;
+      }
+
+      // ── Desktop: existing fly logic, accounting for sidebar overlay
       const alreadyFits     = featureFitsVisibleArea(bounds);
       const alreadyCentered = featureIsCenteredInVisibleArea(bounds);
       const targetFitZoom   = getTargetFitZoom(bounds);
       const needsFly        = !alreadyFits || map.getZoom() < targetFitZoom - 0.05;
       const noInfoVisible   = !infoSidebarEl.classList.contains('active');
-
-      map.stop();
-
-      const openPanel = () => openInfoPanel(bounds.getCenter(), [layer.feature], { source: 'menu' });
 
       if (needsFly) {
         const leftWidth = getLeftOverlayWidth();
