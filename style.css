@@ -1078,6 +1078,9 @@ a {
     pointer-events: none;
   }
 
+  /* Disable transition while finger is actively dragging */
+  .pane-stage.dragging { transition: none !important; }
+
   /* Slide left to show info pane */
   .pane-stage.is-info-view  { --stage-x: -100vw; }
 
@@ -1280,46 +1283,51 @@ a {
 /* rule used in every major CSS reset (normalize.css, sanitize.css, etc.)   */
 [hidden] { display: none !important; }
 
-/* ── INFO PANE RESIZE BUTTON (mobile) ───────────────────────── */
-/* Floats in the top-right of the info sidebar on mobile,        */
-/* cycles through half → full → dismissed states                 */
-.info-resize-btn {
+/* ── INFO PANE DRAG HANDLE (mobile) ─────────────────────────── */
+/* Floats above the top-right of the info banner. User drags     */
+/* it to resize the sheet between peek / half / full states.     */
+.info-drag-handle {
   display: none;
 }
 
 @media (max-width: 768px) {
-  .info-resize-btn {
+  .info-drag-handle {
     display: flex;
     align-items: center;
-    gap: 5px;
+    justify-content: center;
     position: absolute;
-    top: 10px;
-    right: 10px;
+    top: -18px;
+    right: 14px;
+    width: 44px;
+    height: 22px;
     z-index: 1020;
-    background: var(--color-brand-main);
-    color: var(--color-text-on-brand);
-    border: none;
-    border-radius: var(--border-radius-pill);
-    padding: 5px 10px 5px 8px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    transition: background var(--duration-fast), transform var(--duration-fast);
     pointer-events: auto;
+    cursor: grab;
+    touch-action: none;
   }
 
-  .info-resize-btn:hover  { background: var(--color-brand-dark); }
-  .info-resize-btn:active { transform: scale(0.96); }
+  .info-drag-handle:active { cursor: grabbing; }
 
-  .info-resize-btn:focus-visible {
-    outline: 3px solid var(--color-accent);
-    outline-offset: 2px;
+  /* The visible pill */
+  .info-drag-handle__pill {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 36px;
+    height: 18px;
+    background: var(--color-brand-darkest);
+    border-radius: var(--border-radius-pill);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    pointer-events: none;
   }
 
-  .info-resize-btn__icon {
-    font-size: 13px;
-    line-height: 1;
+  /* Two grip lines inside the pill */
+  .info-drag-handle__line {
+    width: 16px;
+    height: 2px;
+    border-radius: 1px;
+    background: rgba(255,255,255,0.7);
   }
 }
