@@ -110,6 +110,7 @@
   let hasEverSelected        = false;
   let isCompactMode          = false; // eslint-disable-line no-unused-vars
   let activeLastLatlng       = null;  // last latlng used to open the info panel
+  let dragState              = null;  // active drag session data
 
 
   // ── 3. DOM REFERENCES ────────────────────────────────────────
@@ -284,32 +285,6 @@
   function setMobileVerticalState(isMinimized) {
     if (!isMobileView() || !paneStageEl) return;
     paneStageEl.classList.toggle('is-minimized', Boolean(isMinimized));
-  }
-
-  // Cycle the info pane through: half → full → dismissed
-  // Called by the resize button in the info panel header
-  function cycleInfoPaneState() {
-    if (!isMobileView() || !paneStageEl) return;
-
-    if (paneStageEl.classList.contains('is-expanded')) {
-      // Full → Half
-      paneStageEl.classList.remove('is-expanded');
-      updateInfoResizeBtn();
-      // Re-centre in the now-smaller visible strip
-      if (activeLastLatlng) {
-        setTimeout(() => flyToMobileVisibleCenter(activeLastLatlng), SHEET_TRANSITION_MS);
-      }
-    } else if (!paneStageEl.classList.contains('is-minimized')) {
-      // Half → Dismissed
-      clearMapSelection();
-    }
-  }
-
-  // Expand the info pane from half to full
-  function expandInfoPane() {
-    if (!isMobileView() || !paneStageEl) return;
-    paneStageEl.classList.add('is-expanded');
-    updateInfoResizeBtn();
   }
 
   function toggleMobileStageMinimized() {
@@ -538,46 +513,135 @@
     });
   }
 
-  // Update the resize button label to reflect the current sheet state
-  function updateInfoResizeBtn() {
-    const btn = document.getElementById('info-resize-btn');
-    if (!btn || !isMobileView()) return;
 
-    const isExpanded = paneStageEl?.classList.contains('is-expanded');
-    const icon  = btn.querySelector('.info-resize-btn__icon');
-    const label = btn.querySelector('.info-resize-btn__label');
+  // ── INFO PANE DRAG HANDLE ─────────────────────────────────────
+  // Creates a small grip pill above the top-right of the info banner.
+  // Dragging it resizes the sheet in real time; releasing snaps to the
+  // nearest state (peek / half / full) using velocity projection.
 
-    if (isExpanded) {
-      if (icon)  icon.textContent  = '↓';
-      if (label) label.textContent = 'Less map';
-    } else {
-      if (icon)  icon.textContent  = '↑';
-      if (label) label.textContent = 'More info';
-    }
+  function ensureInfoDragHandle() {
+    if (!isMobileView() || !infoSidebarEl) return;
+    if (document.getElementById('info-drag-handle')) return;
+
+    const handle = document.createElement('div');
+    handle.id        = 'info-drag-handle';
+    handle.className = 'info-drag-handle';
+    handle.setAttribute('aria-hidden', 'true');
+    handle.innerHTML = `
+      <div class="info-drag-handle__pill">
+        <div class="info-drag-handle__line"></div>
+        <div class="info-drag-handle__line"></div>
+      </div>`;
+
+    handle.addEventListener('touchstart',  onDragStart, { passive: false });
+    handle.addEventListener('touchmove',   onDragMove,  { passive: false });
+    handle.addEventListener('touchend',    onDragEnd,   { passive: false });
+    handle.addEventListener('touchcancel', onDragEnd,   { passive: false });
+
+    infoSidebarEl.appendChild(handle);
   }
 
-  // Ensure the resize button exists inside the info sidebar
-  function ensureInfoResizeBtn() {
-    if (!isMobileView() || !infoSidebarEl) return;
-    if (document.getElementById('info-resize-btn')) return;
+  function onDragStart(e) {
+    if (!isMobileView() || !paneStageEl) return;
+    e.preventDefault();
 
-    const btn       = document.createElement('button');
-    btn.id          = 'info-resize-btn';
-    btn.className   = 'info-resize-btn';
-    btn.type        = 'button';
-    btn.setAttribute('aria-label', 'Expand info panel');
-    btn.innerHTML   = `<span class="info-resize-btn__icon" aria-hidden="true">↑</span><span class="info-resize-btn__label">More info</span>`;
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isExpanded = paneStageEl?.classList.contains('is-expanded');
-      if (isExpanded) {
-        cycleInfoPaneState(); // full → half
-      } else {
-        expandInfoPane();     // half → full
+    const touch = e.touches[0];
+
+    // Read current computed translateY from the CSS transform matrix
+    const matrix   = new DOMMatrix(getComputedStyle(paneStageEl).transform);
+    const currentY = matrix.f; // px
+
+    // X offset: -innerWidth when info-view is active, else 0
+    const stageX = paneStageEl.classList.contains('is-info-view')
+      ? -window.innerWidth
+      : 0;
+
+    dragState = {
+      startTouchY: touch.clientY,
+      baseY:       currentY,
+      stageX,
+      lastY:       currentY,
+      lastTime:    Date.now(),
+      velocity:    0,
+    };
+
+    paneStageEl.classList.add('dragging');
+  }
+
+  function onDragMove(e) {
+    if (!dragState) return;
+    e.preventDefault();
+
+    const touch  = e.touches[0];
+    const deltaY = touch.clientY - dragState.startTouchY;
+    const rawY   = dragState.baseY + deltaY;
+
+    // Clamp between full and peek
+    const H      = window.innerHeight;
+    const minY   = -H * 0.28;          // full state
+    const maxY   = H * 0.60 - 48;      // peek state
+    const clampedY = Math.max(minY, Math.min(maxY, rawY));
+
+    // Track velocity (px/ms)
+    const now = Date.now();
+    const dt  = now - dragState.lastTime;
+    if (dt > 0) {
+      dragState.velocity = (clampedY - dragState.lastY) / dt;
+    }
+    dragState.lastY   = clampedY;
+    dragState.lastTime = now;
+
+    // Apply transform directly — bypasses CSS classes for real-time feel
+    paneStageEl.style.transform = `translate(${dragState.stageX}px, ${clampedY}px)`;
+  }
+
+  function onDragEnd(e) {
+    if (!dragState) return;
+    e.preventDefault();
+
+    const H          = window.innerHeight;
+    const currentY   = dragState.lastY;
+    const velocity   = dragState.velocity; // px/ms
+
+    // Project 150ms forward to weight snap toward momentum direction
+    const projectedY = currentY + velocity * 150;
+
+    // Snap point positions in px
+    const snapPeek = H * 0.60 - 48;
+    const snapHalf = 0;
+    const snapFull = -H * 0.28;
+
+    const distances = [
+      { state: 'peek', dist: Math.abs(projectedY - snapPeek) },
+      { state: 'half', dist: Math.abs(projectedY - snapHalf) },
+      { state: 'full', dist: Math.abs(projectedY - snapFull) },
+    ].sort((a, b) => a.dist - b.dist);
+
+    const target = distances[0].state;
+
+    // Re-enable CSS transition, clear inline override
+    paneStageEl.classList.remove('dragging');
+    paneStageEl.style.transform = '';
+
+    // Apply the snapped state
+    if (target === 'peek') {
+      // Dismisses the panel — same as tapping the close button
+      clearMapSelection();
+    } else if (target === 'half') {
+      paneStageEl.classList.remove('is-minimized', 'is-expanded');
+      if (activeLastLatlng) {
+        setTimeout(() => flyToMobileVisibleCenter(activeLastLatlng), SHEET_TRANSITION_MS);
       }
-    });
+    } else {
+      // full
+      paneStageEl.classList.remove('is-minimized');
+      paneStageEl.classList.add('is-expanded');
+      if (activeLastLatlng) {
+        setTimeout(() => flyToMobileVisibleCenter(activeLastLatlng), SHEET_TRANSITION_MS);
+      }
+    }
 
-    infoSidebarEl.appendChild(btn);
+    dragState = null;
   }
 
   function updateInfoBannerTitle() {
@@ -1172,11 +1236,9 @@
       paneStageEl?.classList.remove('is-minimized', 'is-expanded');
       paneStageEl?.classList.add('is-info-view');
       setMobileInfoPaneVisibility(true);
-      setMapSidebarMobileState('open');
       setInfoSidebarState('open');
       setMobilePaneStage('info');
-      ensureInfoResizeBtn();
-      updateInfoResizeBtn();
+      ensureInfoDragHandle();
 
       // After sheet settles, centre feature in the visible strip above
       if (latlng) {
