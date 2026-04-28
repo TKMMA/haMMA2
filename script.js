@@ -45,6 +45,55 @@
 
   const MOBILE_BREAKPOINT = window.matchMedia('(max-width: 768px)');
 
+  // ── FIELD SCHEMA ─────────────────────────────────────────────
+  // Single source of truth for every field that appears in the info panel.
+  // To add, remove, or re-label a field: edit this config only — no need to
+  // touch the rendering functions below.
+  //
+  // format values:
+  //   'plain'   — escaped text (default)
+  //   'bullet'  — multi-line bulleted list
+  //   'date'    — formatted MM/DD/YYYY
+  //   'rule'    — rule text with Allowed/Prohibited callouts
+  //   'link'    — renders as a .reg-link button; requires linkText
+  //   'join'    — joins multiple keys with <br>; requires keys[]
+  const FIELD_SCHEMA = {
+    about: [
+      {
+        keys:   ['Designation_1', 'Designation_2', 'Designation_3'],
+        label:  'Designation',
+        format: 'join',
+      },
+      { key: 'Island',         label: 'Island' },
+      { key: 'Purpose',        label: 'Purpose',           format: 'bullet' },
+      { key: 'Cultural',       label: 'Cultural Info',     format: 'bullet' },
+      { key: 'Fishing_Info',   label: 'Fishing Info',      format: 'bullet' },
+      { key: 'Establish_Date', label: 'Date Established',  format: 'date'   },
+      { key: 'Location',       label: 'Location' },
+      { key: 'DAR_URL',        label: 'Official DAR Page', format: 'link',  linkText: 'Official DAR page ›' },
+    ],
+    rules: [
+      { key: 'Rules_Gear',             label: 'Gear Rules',           format: 'rule' },
+      { key: 'Rules_Species_Size_Bag', label: 'Species & Bag Limits', format: 'rule' },
+      { key: 'Rules_Activities',       label: 'Activities Rules',     format: 'rule' },
+      { key: 'Rules_Seasons_Times',    label: 'Seasons & Times',      format: 'rule' },
+      { key: 'Rules_Transit_Anchor',   label: 'Transit & Anchor',     format: 'rule' },
+    ],
+    laws: [
+      { key: 'HAR_Name',  label: 'HAR Name' },
+      { key: 'HAR_Link',  label: 'HAR Document', format: 'link', linkText: 'View HAR PDF ›' },
+      { key: 'Penalties', label: 'Penalties',    format: 'bullet' },
+    ],
+  };
+
+  // Summary card pulls from the rules tab fields — driven by schema so it
+  // stays in sync automatically if rules fields are ever added or reordered.
+  const SUMMARY_SCHEMA = FIELD_SCHEMA.rules.map((f) => ({
+    title:    f.label,
+    fieldKey: f.key,
+  }));
+
+
 
   // ── 2. STATE ─────────────────────────────────────────────────
   const allIslandLayers      = {};
@@ -99,9 +148,6 @@
       : `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
   }
 
-  function joinFields(props, ...keys) {
-    return keys.map((k) => getVal(props, k)).filter(Boolean).join('<br>');
-  }
 
   // Normalise Hawaiian diacritics + okina variants for fuzzy search matching
   function normalizeHawaiianText(str) {
@@ -605,6 +651,30 @@
     map.flyTo(target, map.getZoom(), { animate: true, duration, easeLinearity: 0.2 });
   }
 
+
+  // Pan so that latlng sits at the centre of the visible map strip above
+  // the mobile bottom sheet. Called after the sheet animation settles.
+  // Corrects both X and Y — unlike flySelectionIntoVisibleArea which is
+  // desktop-only and only corrects X (no vertical overlay on desktop).
+  function flyToMobileVisibleCenter(latlng, duration = 0.6) {
+    if (!latlng || !isMobileView()) return;
+
+    const rect           = getVisibleMapRect();
+    const visibleCenterX = rect.centerX;
+    const visibleCenterY = rect.top + (rect.bottom - rect.top) / 2;
+
+    const point  = map.latLngToContainerPoint(latlng);
+    const deltaX = Math.round(visibleCenterX - point.x);
+    const deltaY = Math.round(visibleCenterY - point.y);
+
+    // Already centred — skip to avoid unnecessary map movement
+    if (Math.abs(deltaX) < 4 && Math.abs(deltaY) < 4) return;
+
+    const targetPoint  = L.point(point.x + deltaX, point.y + deltaY);
+    const targetLatLng = map.containerPointToLatLng(targetPoint);
+    map.flyTo(targetLatLng, map.getZoom(), { animate: true, duration, easeLinearity: 0.25 });
+  }
+
   // Point-in-polygon using ray casting
   function pointInRing(point, ring) {
     let inside = false;
@@ -778,18 +848,41 @@
 
   // ── 14. INFO PANEL — HTML BUILDERS ───────────────────────────
   // Pure functions — each returns an HTML string.
+  // Field knowledge lives in FIELD_SCHEMA above; these functions are
+  // generic renderers that don't need to know which fields exist.
 
-  function renderField(label, value, { isBullet = false, isDate = false, isRuleText = false } = {}) {
-    if (!value || value === 'N/A' || value === '') return '';
-    const display = isRuleText ? formatRuleText(value)
-                 : isDate      ? formatDate(value)
-                 : isBullet    ? formatBulletsWithIndents(value)
-                 :               escapeHtml(value);
+  // Render a single field row given a schema entry and a properties object
+  function renderSchemaField(entry, props) {
+    // Resolve the value — 'join' format merges multiple keys
+    const value = entry.format === 'join'
+      ? (entry.keys || []).map((k) => getVal(props, k)).filter(Boolean).join('<br>')
+      : getVal(props, entry.key);
+
+    if (!value) return '';
+
+    // 'link' format renders as a button-style anchor, no label row needed
+    if (entry.format === 'link') {
+      return `<a class="reg-link" href="${escapeHtml(value)}" target="_blank" rel="noopener">${entry.linkText || value}</a>`;
+    }
+
+    const display =
+      entry.format === 'rule'   ? formatRuleText(value)
+      : entry.format === 'bullet' ? formatBulletsWithIndents(value)
+      : entry.format === 'date'   ? formatDate(value)
+      :                             escapeHtml(value);
+
     return `
       <div class="field-block">
-        <div class="field-block__label">${label}</div>
+        <div class="field-block__label">${entry.label}</div>
         <div>${display}</div>
       </div>`;
+  }
+
+  // Render all fields for a given tab from the schema
+  function renderTab(tabKey, props) {
+    return (FIELD_SCHEMA[tabKey] || [])
+      .map((entry) => renderSchemaField(entry, props))
+      .join('');
   }
 
   function buildAreaNamesList(features) {
@@ -804,6 +897,8 @@
       </div>`).join('');
   }
 
+  // Summary card block — driven by SUMMARY_SCHEMA so it stays in sync
+  // with the rules tab automatically
   function buildSummaryBlock(title, fieldKey, features) {
     const items = features
       .map((f) => ({
@@ -828,7 +923,6 @@
     const stateRegsUrl =
       getVal(features[0].properties, 'State_Fishing_Regs_URL') || FALLBACK_REGS_URL;
 
-    // FIX: typo "still apply" corrected to "still apply"
     return `
       <div class="summary-accordion">
         <button
@@ -855,11 +949,7 @@
                 <button class="active" type="button">CONSOLIDATED RULES</button>
               </div>
               <div class="tab-pane summary-field-stack">
-                ${buildSummaryBlock('Gear Restrictions',      'Rules_Gear',             features)}
-                ${buildSummaryBlock('Species & Bag Limits',   'Rules_Species_Size_Bag', features)}
-                ${buildSummaryBlock('Prohibited Activities',  'Rules_Activities',       features)}
-                ${buildSummaryBlock('Seasons & Times Rules',  'Rules_Seasons_Times',    features)}
-                ${buildSummaryBlock('Transit & Anchor Rules', 'Rules_Transit_Anchor',   features)}
+                ${SUMMARY_SCHEMA.map((s) => buildSummaryBlock(s.title, s.fieldKey, features)).join('')}
               </div>
             </div>
           </div>
@@ -894,9 +984,6 @@
       getVal(props, 'Area_Image_URL_3'),
     ].filter(Boolean);
 
-    // FIX: typo "still apply" corrected to "still apply"
-    // NOTE: tabs now use data-tab-target instead of inline onclick —
-    // handled by event delegation in the info panel click listener below.
     return `
       <div class="area-section mmcard">
         ${buildCarousel(images, name)}
@@ -910,16 +997,7 @@
           </div>
 
           <div id="about-${uid}" class="tab-pane field-stack" hidden>
-            ${renderField('Designation',      joinFields(props, 'Designation_1', 'Designation_2', 'Designation_3'))}
-            ${renderField('Island',           getVal(props, 'Island'))}
-            ${renderField('Purpose',          getVal(props, 'Purpose'),       { isBullet: true })}
-            ${renderField('Cultural Info',    getVal(props, 'Cultural'),      { isBullet: true })}
-            ${renderField('Fishing Info',     getVal(props, 'Fishing_Info'),  { isBullet: true })}
-            ${renderField('Date Established', getVal(props, 'Establish_Date'), { isDate: true })}
-            ${renderField('Location',         getVal(props, 'Location'))}
-            ${getVal(props, 'DAR_URL')
-              ? `<a class="reg-link" href="${escapeHtml(getVal(props, 'DAR_URL'))}" target="_blank" rel="noopener">Official DAR page ›</a>`
-              : ''}
+            ${renderTab('about', props)}
           </div>
 
           <div id="rules-${uid}" class="tab-pane field-stack">
@@ -928,19 +1006,11 @@
               <a href="${escapeHtml(stateUrl)}" target="_blank" rel="noopener">Statewide Fishing Regulations</a>
               still apply here.
             </div>
-            ${renderField('Gear Rules',           getVal(props, 'Rules_Gear'),             { isRuleText: true })}
-            ${renderField('Species & Bag Limits', getVal(props, 'Rules_Species_Size_Bag'), { isRuleText: true })}
-            ${renderField('Activities Rules',     getVal(props, 'Rules_Activities'),        { isRuleText: true })}
-            ${renderField('Seasons & Times',      getVal(props, 'Rules_Seasons_Times'),     { isRuleText: true })}
-            ${renderField('Transit & Anchor',     getVal(props, 'Rules_Transit_Anchor'),    { isRuleText: true })}
+            ${renderTab('rules', props)}
           </div>
 
           <div id="laws-${uid}" class="tab-pane field-stack" hidden>
-            ${renderField('HAR Name', getVal(props, 'HAR_Name'))}
-            ${getVal(props, 'HAR_Link')
-              ? `<a class="reg-link" href="${escapeHtml(getVal(props, 'HAR_Link'))}" target="_blank" rel="noopener">View HAR PDF ›</a>`
-              : ''}
-            ${renderField('Penalties', getVal(props, 'Penalties'), { isBullet: true })}
+            ${renderTab('laws', props)}
           </div>
 
         </div>
@@ -1027,6 +1097,14 @@
       setMapSidebarMobileState('open');
       setInfoSidebarState('open');
       setMobilePaneStage('info');
+
+      // After the sheet finishes sliding up (400ms transition), centre the
+      // selected feature in the visible map strip above it.
+      // The 420ms delay gives the CSS transition time to fully settle so
+      // getBoundingClientRect() returns the final resting position.
+      if (latlng) {
+        setTimeout(() => flyToMobileVisibleCenter(latlng), 420);
+      }
     } else {
       setInfoSidebarState('expanded');
     }
