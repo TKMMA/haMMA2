@@ -1202,3 +1202,8 @@ a {
 /* Area section wrapper — groups carousel + card body inside the     */
 /* info panel; inherits mmcard visuals, no additional styles needed  */
 .area-section { display: block; }
+
+/* Ensure the HTML hidden attribute always wins over display rules from     */
+/* component classes like .field-stack { display: grid }. This mirrors the  */
+/* rule used in every major CSS reset (normalize.css, sanitize.css, etc.)   */
+[hidden] { display: none !important; }
