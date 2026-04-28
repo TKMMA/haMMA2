@@ -591,16 +591,22 @@ a {
   position: sticky;
   top: 0;
   z-index: 5;
-  padding: 8px 12px;
   min-height: var(--top-band-height);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   background: var(--color-surface-search);
   border-bottom: 1px solid var(--color-border-brand);
   border-top-left-radius: var(--border-radius-lg);
   border-top-right-radius: var(--border-radius-lg);
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* Default single-area header — centred label */
+.mmpopup__header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  min-height: var(--top-band-height);
 }
 
 .mmpopup__header-title {
@@ -609,6 +615,74 @@ a {
   color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+/* Multi-area header — becomes a summary toggle button */
+.mmpopup__header--toggle {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--font);
+  text-align: left;
+}
+
+.mmpopup__header--toggle:hover .mmpopup__summary-trigger {
+  background: var(--color-brand-accordion-hover);
+}
+
+.mmpopup__header--toggle:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: -3px;
+}
+
+/* Top row: area count + chevron */
+.mmpopup__header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  min-height: var(--top-band-height);
+  gap: 10px;
+}
+
+/* Bottom row: the prominent summary CTA */
+.mmpopup__summary-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 14px;
+  background: var(--color-brand-accordion);
+  border-top: 1px solid rgba(0,0,0,0.08);
+  transition: background var(--duration-fast);
+}
+
+.mmpopup__summary-trigger-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.35;
+}
+
+.mmpopup__summary-trigger-chevron {
+  font-size: 11px;
+  color: rgba(255,255,255,0.85);
+  transition: transform 0.25s ease;
+  flex-shrink: 0;
+}
+
+/* Rotate chevron when expanded */
+.mmpopup__header--toggle[aria-expanded="true"] .mmpopup__summary-trigger-chevron {
+  transform: rotate(180deg);
+}
+
+/* Keep the summary panel right below the header in the scroll area */
+.summary-accordion__panel--inline {
+  overflow: hidden;
 }
 
 .mmpopup__scroll {
@@ -631,14 +705,9 @@ a {
 
 /* ── 13. SUMMARY ACCORDION ──────────────────────────────────── */
 .summary-accordion {
-  position: sticky;
-  top: 10px;
-  z-index: 12;
   margin: 0 0 12px;
   background: var(--color-surface-base);
 }
-
-.summary-accordion.expanded { position: relative; }
 
 .summary-accordion__toggle {
   width: 100%;
@@ -991,7 +1060,7 @@ a {
     bottom: 0;
     left: 0;
     width: 200vw;
-    height: 60dvh;
+    height: 90dvh;
     display: flex;
     gap: 0;
     margin-bottom: calc(
@@ -1015,16 +1084,19 @@ a {
   /* Peek state — only the handle strip is visible */
   .pane-stage.is-minimized  { --stage-y: calc(60dvh - var(--sheet-handle-height)); }
 
-  /* Expanded state — full sheet visible */
-  .pane-stage:not(.is-minimized) { --stage-y: 0; }
+  /* Half state — sheet open at default height (60dvh), map visible above */
+  .pane-stage:not(.is-minimized):not(.is-expanded) { --stage-y: 0; }
+
+  /* Full state — sheet covers ~88dvh, just the brand panel above */
+  .pane-stage.is-expanded   { --stage-y: calc(-28dvh); }
 
   /* ── Sidebars become bottom sheet panels ── */
   .map-sidebar,
   .info-sidebar {
     position: relative;
     width: 100vw;
-    height: 60dvh;
-    max-height: 60dvh;
+    height: 90dvh;
+    max-height: 90dvh;
     margin: 0;
     top: auto;
     left: auto;
@@ -1207,3 +1279,47 @@ a {
 /* component classes like .field-stack { display: grid }. This mirrors the  */
 /* rule used in every major CSS reset (normalize.css, sanitize.css, etc.)   */
 [hidden] { display: none !important; }
+
+/* ── INFO PANE RESIZE BUTTON (mobile) ───────────────────────── */
+/* Floats in the top-right of the info sidebar on mobile,        */
+/* cycles through half → full → dismissed states                 */
+.info-resize-btn {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .info-resize-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1020;
+    background: var(--color-brand-main);
+    color: var(--color-text-on-brand);
+    border: none;
+    border-radius: var(--border-radius-pill);
+    padding: 5px 10px 5px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    transition: background var(--duration-fast), transform var(--duration-fast);
+    pointer-events: auto;
+  }
+
+  .info-resize-btn:hover  { background: var(--color-brand-dark); }
+  .info-resize-btn:active { transform: scale(0.96); }
+
+  .info-resize-btn:focus-visible {
+    outline: 3px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  .info-resize-btn__icon {
+    font-size: 13px;
+    line-height: 1;
+  }
+}
