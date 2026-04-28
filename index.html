@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Primary meta -->
+  <title>Hawaii Managed Marine Areas</title>
+  <meta name="description" content="Interactive map of Hawaii's managed marine and freshwater areas, maintained by the Division of Aquatic Resources." />
+
+  <!-- Open Graph (link previews) -->
+  <meta property="og:title" content="Hawaii Managed Marine Areas" />
+  <meta property="og:description" content="Interactive map of Hawaii's managed marine and freshwater areas." />
+  <meta property="og:type" content="website" />
+
+  <!-- Preconnect for faster font load -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+  />
+
+  <!-- Leaflet -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+
+  <!-- App styles -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="map-interface">
+
+    <!-- Brand / header bar -->
+    <header class="brand-panel" id="brand-panel" role="banner">
+      <div class="brand-header">
+        <div class="brand-side-label" aria-hidden="true">Division of Aquatic Resources</div>
+        <img
+          class="brand-logo"
+          src="https://devdar.rapidteksolutions.com/wp-content/themes/react-ts-theme/assets/img/logo-dar.png"
+          alt="Division of Aquatic Resources logo"
+          width="36"
+          height="36"
+        />
+        <div class="brand-title-block">
+          <h1 class="brand-title-main">Managed Areas</h1>
+          <p class="brand-title-sub">Marine and Freshwater</p>
+        </div>
+        <img
+          class="brand-logo"
+          src="https://devdar.rapidteksolutions.com/wp-content/themes/react-ts-theme/assets/img/logo-state-of-hawai.png"
+          alt="State of Hawaiʻi logo"
+          width="36"
+          height="36"
+        />
+        <div class="brand-side-label" aria-hidden="true">State of Hawaiʻi</div>
+      </div>
+    </header>
+
+    <!-- Sliding pane stage (contains both sidebars on mobile) -->
+    <div class="pane-stage is-minimized" id="pane-stage">
+
+      <!-- Areas list sidebar -->
+      <aside
+        id="map-sidebar"
+        class="map-sidebar"
+        role="complementary"
+        aria-label="Marine and freshwater areas list"
+      >
+        <div class="sidebar-search-wrap">
+          <div class="search-input-wrapper">
+            <label for="area-search" class="sr-only">Search marine and freshwater areas</label>
+            <input
+              type="search"
+              id="area-search"
+              placeholder="Search areas…"
+              autocomplete="off"
+              spellcheck="false"
+              aria-controls="island-list"
+            />
+            <button
+              class="search-clear-btn"
+              type="button"
+              aria-label="Clear search"
+              title="Clear search"
+              id="search-clear-btn"
+            >✕</button>
+            <span class="search-icon" aria-hidden="true">🔍</span>
+          </div>
+        </div>
+
+        <div
+          id="island-list"
+          class="island-list"
+          role="list"
+          aria-label="Areas grouped by island"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <div id="loading-notice" class="loading-notice" role="status">
+            Loading marine areas…
+          </div>
+        </div>
+      </aside>
+
+      <!-- Area detail sidebar -->
+      <aside
+        id="info-sidebar"
+        class="info-sidebar"
+        role="region"
+        aria-label="Area details"
+        aria-live="polite"
+      >
+        <button
+          id="close-info-btn"
+          class="close-info-btn"
+          type="button"
+          title="Close area info"
+          aria-label="Close area info"
+        >✕</button>
+        <div id="info-content" class="info-content"></div>
+      </aside>
+
+    </div><!-- /.pane-stage -->
+
+    <!-- Map -->
+    <div id="map" role="application" aria-label="Interactive map of Hawaii managed areas"></div>
+
+  </div><!-- /.map-interface -->
+
+  <!-- Leaflet -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WPeE="
+    crossorigin=""
+  ></script>
+
+  <!-- App script -->
+  <script src="script.js"></script>
+</body>
+</html>
