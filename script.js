@@ -109,7 +109,6 @@
   const infoContentEl  = document.getElementById('info-content');
   const areaSearchEl   = document.getElementById('area-search');
   const searchClearEl  = document.getElementById('search-clear-btn');
-  const closeInfoBtnEl = document.getElementById('close-info-btn');
 
 
   // ── 4. UTILITIES ─────────────────────────────────────────────
@@ -497,7 +496,7 @@
     zone.addEventListener('touchend',    onBannerDragEnd,   { passive: false });
     zone.addEventListener('touchcancel', onBannerDragEnd,   { passive: false });
 
-    // Tap (no drag) on the info banner when collapsed → restore to info-half
+    // Tap (no drag) on the info tab when collapsed → restore to info-half
     if (panel === 'info') {
       zone.addEventListener('click', () => {
         if (mobileState === 'hidden' && paneStageEl?.classList.contains('is-info-view')) {
@@ -1012,7 +1011,11 @@
 
     const label = btn.querySelector('.mmpopup__summary-trigger-label');
     if (label) {
-      label.textContent = expand ? 'Hide combined rules' : 'See combined fishing rules';
+      // Restore the count prefix when collapsing — read it from aria-label or data attribute
+      const count = btn.dataset.areaCount || '';
+      label.textContent = expand
+        ? 'Hide combined rules'
+        : `${count} Overlapping Areas — See combined fishing rules`;
     }
   }
 
@@ -1047,10 +1050,10 @@
            type="button"
            aria-expanded="false"
            data-action="toggle-summary"
+           data-area-count="${count}"
          >
-           <span class="mmpopup__summary-banner__count">${count} Overlapping Areas</span>
            <span class="mmpopup__summary-banner__cta">
-             <span class="mmpopup__summary-trigger-label">See combined fishing rules</span>
+             <span class="mmpopup__summary-trigger-label">${count} Overlapping Areas — See combined fishing rules</span>
              <span class="mmpopup__summary-trigger-chevron" aria-hidden="true">▼</span>
            </span>
          </button>`
@@ -1515,20 +1518,15 @@
   areaSearchEl?.addEventListener('input',  () => { syncSearchClearVisibility(); filterSidebar(); });
   searchClearEl?.addEventListener('click', clearSidebarSearch);
 
-  // Desktop close button
-  closeInfoBtnEl?.addEventListener('click', clearMapSelection);
-
   // Mobile banner buttons
   document.getElementById('info-back-btn')?.addEventListener('click', () => {
     // Slide back to list at the same height the info panel was at
     applyMobileState(infoToListState(mobileState));
   });
 
-  // Wire drag zones to the state machine.
-  // List side: the brand panel itself is the drag surface.
-  // Info side: the info-mobile-header contains the drag zone.
-  wireSheetBannerDrag('brand-panel', 'list');
-  wireSheetBannerDrag('info-banner', 'info');
+  // Wire drag zones — the protruding tab is the touch target for both panels.
+  wireSheetBannerDrag('list-drag-zone', 'list');
+  wireSheetBannerDrag('info-drag-zone', 'info');
 
   // Info panel — single delegated listener for all dynamic content:
   // tab buttons, summary accordion toggle, and image carousel
