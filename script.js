@@ -928,8 +928,7 @@
     return `
       <div class="summary-accordion__panel--inline" hidden>
         <div class="area-section mmcard mmcard--summary" style="border-top-left-radius:0;border-top-right-radius:0;margin-bottom:0;">
-          <div class="mmcard__body">
-            <h3 class="mmcard__title">Fishing Rules Summary</h3>
+          <div class="mmcard__body mmcard__body--summary">
             <div class="mmcard__subtitle">${buildAreaNamesList(features)}</div>
             <div class="mmtabs">
               <button class="active" type="button">CONSOLIDATED RULES</button>
@@ -1074,6 +1073,12 @@
 
   function toggleSummaryAccordion(btn) {
     const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+    if (!isExpanded) {
+      const scroll = btn.closest('.mmpopup')?.querySelector('.mmpopup__scroll');
+      if (scroll && scroll.scrollTop > 0) {
+        scroll.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
     setSummaryExpanded(btn, !isExpanded);
   }
 
@@ -1156,7 +1161,7 @@
     if (infoBannerTitle) {
       infoBannerTitle.textContent = features.length === 1
         ? (getVal(features[0].properties, 'Full_name') || getVal(features[0].properties, 'Full_Name') || 'Area Info')
-        : `${features.length} Areas`;
+        : `${features.length} Areas Selected`;
     }
 
     if (isMobileView()) {
@@ -1167,6 +1172,11 @@
 
     hasEverSelected = true;
     hideInfoHint();
+
+    if (options.source === 'menu' && activeSelectionMarker) {
+      map.removeLayer(activeSelectionMarker);
+      activeSelectionMarker = null;
+    }
 
     if (options.source === 'map' && latlng) {
       clearAccordionSelectionHighlight();

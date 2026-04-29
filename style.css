@@ -712,13 +712,13 @@ a {
 }
 
 .mmpopup__scroll {
-  scroll-padding-top: 6px;
+  scroll-padding-top: 0;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
-  padding: 10px 12px;
+  padding: 0 12px 10px;
 }
 
 .mmpopup__scroll::-webkit-scrollbar { width: 5px; }
@@ -808,6 +808,10 @@ a {
 }
 
 .mmcard__body { padding: 14px; }
+
+.mmcard__body--summary {
+  padding-top: 0;
+}
 
 .mmcard__title {
   font-size: 16px;
@@ -1194,7 +1198,7 @@ a {
 
   /* Safe-area scroll padding */
   .mmpopup__scroll {
-  scroll-padding-top: 6px;
+    scroll-padding-top: 0;
     padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
 
@@ -1225,11 +1229,11 @@ a {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 5px;
+    justify-content: flex-start;
+    gap: 8px;
     cursor: grab;
     touch-action: none;
-    padding: 6px 0;
+    padding: 4px 0 0;
     user-select: none;
     -webkit-user-select: none;
     position: relative;
