@@ -957,7 +957,9 @@
              `<span class="mmcard__image-dot${i === 0 ? ' is-active' : ''}"></span>`
            ).join('')}
          </div>`
-      : '';
+      : `<div class="mmpopup__header-inner">
+           <span class="mmpopup__header-title">${headerTitle}</span>
+         </div>`;
     const navButtons = multi
       ? `<button
            class="mmcard__image-nav mmcard__image-prev"
@@ -1186,7 +1188,10 @@
     }
 
     // Update info banner title if area name is available
-    const infoBannerTitles = [document.getElementById('info-banner-title'), document.getElementById('info-banner-title-mobile')];
+    const infoBannerTitles = [
+      document.getElementById('info-banner-title'),
+      document.getElementById('info-banner-title-mobile'),
+    ];
     infoBannerTitles.forEach((el) => {
       if (el) el.textContent = `${features.length} AREA${features.length === 1 ? '' : 'S'} SELECTED`;
     });
