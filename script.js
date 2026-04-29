@@ -106,7 +106,6 @@
   let activeAreaSelection    = null; // eslint-disable-line no-unused-vars
   let infoHintEl             = null;
   let infoHintTimer          = null;
-  let mobileInfoHideTimer    = null;
   let hasEverSelected        = false;
   let isCompactMode          = false; // eslint-disable-line no-unused-vars
   let activeLastLatlng       = null;  // last latlng used to open the info panel
@@ -651,9 +650,8 @@
     // ── Compute target latlng: where the map centre needs to be so       ──
     // ── that `center` ends up at (stripCenterX, stripCenterY) on screen. ──
     // Project at the target zoom (not current zoom!), then offset.
-    const centerPoint   = map.project(center, targetZoom);
-    const screenCenter  = map.project(map.getCenter(), targetZoom);
-    const offsetX       = stripCenterX - screenW / 2;
+    const centerPoint    = map.project(center, targetZoom);
+    const offsetX        = stripCenterX - screenW / 2;
     const offsetY       = stripCenterY - screenH / 2;
     const targetMapPoint = centerPoint.subtract(L.point(offsetX, offsetY));
     const targetLatLng   = map.unproject(targetMapPoint, targetZoom);
@@ -1108,14 +1106,13 @@
     }
 
     const isMulti     = features.length > 1;
-    const headerTitle = isMulti ? `${features.length} Areas Selected` : '1 Area Selected';
+    const headerTitle = isMulti
+      ? `${features.length} Areas Selected`
+      : (getVal(features[0].properties, 'Full_name') || getVal(features[0].properties, 'Full_Name') || '1 Area Selected');
     const cardsHtml   = features.map((f, i) => buildAreaCard(f, `area-${i}`)).join('');
-    const dividerHtml = isMulti
-      ? ''
-      : '';
 
     // Multi-area: header becomes the summary accordion trigger.
-    // Single area: plain centred label as before.
+    // Single area: plain centred label.
     const headerHtml = isMulti
       ? `<button
            class="mmpopup__header--toggle"
@@ -1134,7 +1131,9 @@
              ${buildAreaNamesPlainList(features)}
            </ul>
          </button>`
-      : '';
+      : `<div class="mmpopup__header-inner">
+           <span class="mmpopup__header-title">${escapeHtml(headerTitle)}</span>
+         </div>`;
 
     // Summary panel is now just the card content (no outer accordion wrapper)
     // — the trigger lives in the header above
@@ -1142,10 +1141,9 @@
 
     infoContentEl.innerHTML = `
       <div class="mmpopup">
-        ${headerHtml ? `<div class="mmpopup__header">${headerHtml}</div>` : ''}
+        <div class="mmpopup__header">${headerHtml}</div>
         <div class="mmpopup__scroll">
           ${summaryPanelHtml}
-          ${dividerHtml}
           ${cardsHtml}
         </div>
       </div>`;
@@ -1185,14 +1183,12 @@
       }
     }
 
-    // Update info banner title if area name is available
-    const infoBannerTitles = [
-      document.getElementById('info-banner-title'),
-      document.getElementById('info-banner-title-mobile'),
-    ];
-    infoBannerTitles.forEach((el) => {
-      if (el) el.textContent = `${features.length} AREA${features.length === 1 ? '' : 'S'} SELECTED`;
-    });
+    // Update both the desktop header title and the mobile banner title
+    const titleText = `${features.length} AREA${features.length === 1 ? '' : 'S'} SELECTED`;
+    const desktopTitle = document.getElementById('info-banner-title');
+    const mobileTitle  = document.getElementById('info-banner-title-mobile');
+    if (desktopTitle) desktopTitle.textContent = titleText;
+    if (mobileTitle)  mobileTitle.textContent  = titleText;
 
     if (isMobileView()) {
       applyMobileState('info-half');
