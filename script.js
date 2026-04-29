@@ -110,7 +110,6 @@
   let hasEverSelected        = false;
   let isCompactMode          = false; // eslint-disable-line no-unused-vars
   let activeLastLatlng       = null;  // last latlng used to open the info panel
-  let dragState              = null;  // active drag session data
   let _flyTimer              = null;  // pending mobile fly-to timer
 
 
@@ -301,6 +300,7 @@
   let mobileState    = 'hidden';
   let lastListState  = 'list-open'; // remembered when switching to info view
   let activeLastBounds = null;      // L.LatLngBounds of current selection
+  let _pendingMoveendHandler = null; // moveend handler waiting on flyToBounds
 
   // Snap positions as a fraction of screen height (stage Y offset)
   // These mirror the CSS custom property values in style.css
@@ -392,6 +392,10 @@
 
     syncSidebarToggleUI();
     syncLeafletControlPosition();
+
+    // Tell Leaflet about the size change so tiles aren't clipped
+    // after orientation flips or window resizes.
+    if (map) map.invalidateSize({ animate: false });
   }
 
   function setInitialMapExtent() {
@@ -637,7 +641,10 @@
         false,
         L.point(Math.max(40, screenW - stripW), Math.max(40, screenH - stripH)),
       );
-      targetZoom = Math.min(targetZoom, 16);
+      // Clamp to map's zoom range (imagery has no detail past ~17–18)
+      const maxZ = map.getMaxZoom?.() ?? 18;
+      const minZ = map.getMinZoom?.() ?? 0;
+      targetZoom = Math.max(minZ, Math.min(targetZoom, Math.min(16, maxZ)));
     }
 
     // ── Compute target latlng: where the map centre needs to be so       ──
@@ -672,9 +679,11 @@
     for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
       const [xi, yi] = ring[i];
       const [xj, yj] = ring[j];
+      // Parity check below makes this branch unreachable for horizontal
+      // edges (yi === yj), so no divide-by-zero guard is needed.
       const intersect =
         (yi > point[1]) !== (yj > point[1]) &&
-        point[0] < ((xj - xi) * (point[1] - yi)) / ((yj - yi) || 1e-12) + xi;
+        point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi;
       if (intersect) inside = !inside;
     }
     return inside;
@@ -789,11 +798,14 @@
     return el;
   }
 
-  function showInfoHint() {
+  function showInfoHint(opts = {}) {
     const el = ensureInfoHint();
     if (!el) return;
-    if (infoHintTimer) clearTimeout(infoHintTimer);
+    if (infoHintTimer) { clearTimeout(infoHintTimer); infoHintTimer = null; }
     el.classList.add('active');
+    // Persistent hint (e.g. first-time onboarding) doesn't auto-dismiss —
+    // it stays up until the user either dismisses it or makes a selection.
+    if (opts.persistent) return;
     infoHintTimer = setTimeout(() => {
       el.classList.remove('active');
       infoHintTimer = null;
@@ -913,9 +925,6 @@
   // Build just the collapsible panel content — the trigger button now lives
   // in the mmpopup header so it's always visible regardless of scroll position.
   function buildSummaryPanel(features) {
-    const stateRegsUrl =
-      getVal(features[0].properties, 'State_Fishing_Regs_URL') || FALLBACK_REGS_URL;
-
     return `
       <div class="summary-accordion__panel--inline" hidden>
         <div class="area-section mmcard mmcard--summary" style="border-top-left-radius:0;border-top-right-radius:0;margin-bottom:0;">
@@ -923,11 +932,6 @@
             <h3 class="mmcard__title">Fishing Rules Summary</h3>
             <span class="mmcard__subtitle-label">Managed areas at this location:</span>
             <div class="mmcard__subtitle">${buildAreaNamesList(features)}</div>
-            <div class="mm-statewide-notice">
-              Reminder: All
-              <a href="${escapeHtml(stateRegsUrl)}" target="_blank" rel="noopener">Statewide Fishing Regulations</a>
-              still apply here.
-            </div>
             <div class="mmtabs">
               <button class="active" type="button">CONSOLIDATED RULES</button>
             </div>
@@ -942,24 +946,41 @@
   function buildCarousel(images, areaName) {
     if (!images.length) return '';
     const encodedImages = images.map((u) => encodeURIComponent(u)).join('|');
+    const multi = images.length > 1;
+    const dots = multi
+      ? `<div class="mmcard__image-dots" aria-hidden="true">
+           ${images.map((_, i) =>
+             `<span class="mmcard__image-dot${i === 0 ? ' is-active' : ''}"></span>`
+           ).join('')}
+         </div>`
+      : '';
+    const navButtons = multi
+      ? `<button
+           class="mmcard__image-nav mmcard__image-prev"
+           type="button"
+           aria-label="Previous image"
+           data-images="${encodedImages}"
+           data-direction="-1"
+         >‹</button>
+         <button
+           class="mmcard__image-nav mmcard__image-next"
+           type="button"
+           aria-label="Next image"
+           data-images="${encodedImages}"
+           data-direction="1"
+         >›</button>`
+      : '';
     return `
       <div class="mmcard__image-wrap" data-carousel-index="0">
         <img class="mmcard__image" src="${escapeHtml(images[0])}" alt="${escapeHtml(areaName)}">
-        ${images.length > 1
-          ? `<button
-               class="mmcard__image-next"
-               type="button"
-               aria-label="Next image"
-               data-images="${encodedImages}"
-             >›</button>`
-          : ''}
+        ${navButtons}
+        ${dots}
       </div>`;
   }
 
   function buildAreaCard(feature, uid) {
     const props    = feature.properties;
     const name     = getVal(props, 'Full_name') || getVal(props, 'Full_Name') || 'Unknown Area';
-    const stateUrl = getVal(props, 'State_Fishing_Regs_URL') || FALLBACK_REGS_URL;
     const images   = [
       getVal(props, 'Area_Image_URL_1'),
       getVal(props, 'Area_Image_URL_2'),
@@ -983,11 +1004,6 @@
           </div>
 
           <div id="rules-${uid}" class="tab-pane field-stack">
-            <div class="mm-statewide-notice">
-              Reminder: All
-              <a href="${escapeHtml(stateUrl)}" target="_blank" rel="noopener">Statewide Fishing Regulations</a>
-              still apply here.
-            </div>
             ${renderTab('rules', props)}
           </div>
 
@@ -1100,6 +1116,17 @@
            <span class="mmpopup__header-title">${headerTitle}</span>
          </div>`;
 
+    // Single statewide-regs reminder at top of scroll (was previously
+    // duplicated inside every area card and inside the summary panel).
+    const stateRegsUrl =
+      getVal(features[0].properties, 'State_Fishing_Regs_URL') || FALLBACK_REGS_URL;
+    const stateNoticeHtml = `
+      <div class="mm-statewide-notice mm-statewide-notice--top">
+        Reminder: All
+        <a href="${escapeHtml(stateRegsUrl)}" target="_blank" rel="noopener">Statewide Fishing Regulations</a>
+        still apply here.
+      </div>`;
+
     // Summary panel is now just the card content (no outer accordion wrapper)
     // — the trigger lives in the header above
     const summaryPanelHtml = isMulti ? buildSummaryPanel(features) : '';
@@ -1109,56 +1136,20 @@
         <div class="mmpopup__header">${headerHtml}</div>
         <div class="mmpopup__scroll">
           ${summaryPanelHtml}
+          ${stateNoticeHtml}
           ${dividerHtml}
           ${cardsHtml}
         </div>
       </div>`;
 
     const scrollEl = infoContentEl.querySelector('.mmpopup__scroll');
-    if (scrollEl) {
-      scrollEl.scrollTop = 0;
-
-      // Auto-collapse the summary when scrolling up past it.
-      // Only triggers on upward scroll to avoid a jump when scrolling down.
-      let _lastScrollTop   = 0;
-      let _collapseTimer   = null;
-
-      scrollEl.addEventListener('scroll', () => {
-        const currentTop = scrollEl.scrollTop;
-        const scrollingUp = currentTop < _lastScrollTop;
-        _lastScrollTop = currentTop;
-
-        if (!scrollingUp) return;
-
-        const summaryPanel = scrollEl.querySelector('.summary-accordion__panel--inline');
-        const toggleBtn    = infoContentEl.querySelector('.mmpopup__header--toggle');
-        if (!summaryPanel || !toggleBtn) return;
-        if (toggleBtn.getAttribute('aria-expanded') !== 'true') return;
-
-        // Check if the panel's bottom has scrolled above the container top
-        const panelBottom    = summaryPanel.getBoundingClientRect().bottom;
-        const containerTop   = scrollEl.getBoundingClientRect().top;
-
-        if (panelBottom <= containerTop) {
-          if (_collapseTimer) return; // already pending
-          _collapseTimer = setTimeout(() => {
-            _collapseTimer = null;
-            // Re-check in case user scrolled back down during debounce
-            const pb  = summaryPanel.getBoundingClientRect().bottom;
-            const ct  = scrollEl.getBoundingClientRect().top;
-            if (pb <= ct && toggleBtn.getAttribute('aria-expanded') === 'true') {
-              setSummaryExpanded(toggleBtn, false);
-            }
-          }, 200);
-        }
-      }, { passive: true });
-    }
+    if (scrollEl) scrollEl.scrollTop = 0;
 
     // Update info banner title if area name is available
     const infoBannerTitle = document.getElementById('info-banner-title');
     if (infoBannerTitle) {
       infoBannerTitle.textContent = features.length === 1
-        ? (getVal(features[0].properties, 'Full_Name') || getVal(features[0].properties, 'Full_name') || 'Area Info')
+        ? (getVal(features[0].properties, 'Full_name') || getVal(features[0].properties, 'Full_Name') || 'Area Info')
         : `${features.length} Areas`;
     }
 
@@ -1248,7 +1239,12 @@
       item.dataset.area   = areaName;
 
       item.addEventListener('click',      () => zoomToArea(islandName, areaName));
-      item.addEventListener('keydown',    (e) => { if (e.key === 'Enter') zoomToArea(islandName, areaName); });
+      item.addEventListener('keydown',    (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault(); // stop Space from scrolling the list
+          zoomToArea(islandName, areaName);
+        }
+      });
       item.addEventListener('mouseenter', () => hoverArea(islandName, areaName));
       item.addEventListener('mouseleave', clearHoverHighlight);
 
@@ -1332,13 +1328,28 @@
       const needsFly        = !alreadyFits || map.getZoom() < targetFitZoom - 0.05;
       const noInfoVisible   = !infoSidebarEl.classList.contains('active');
 
+      // Cancel any pending moveend from a previous selection so its
+      // late-firing flash doesn't land on the wrong polygon.
+      if (_pendingMoveendHandler) {
+        map.off('moveend', _pendingMoveendHandler);
+        _pendingMoveendHandler = null;
+      }
+
+      const queueMoveend = (fn) => {
+        _pendingMoveendHandler = () => {
+          _pendingMoveendHandler = null;
+          fn();
+        };
+        map.once('moveend', _pendingMoveendHandler);
+      };
+
       if (needsFly) {
         const leftWidth = getLeftOverlayWidth();
         if (noInfoVisible) {
-          map.once('moveend', () => { openPanel(); flashLayerBorder(layer); });
+          queueMoveend(() => { openPanel(); flashLayerBorder(layer); });
         } else {
           openPanel();
-          map.once('moveend', () => flashLayerBorder(layer));
+          queueMoveend(() => flashLayerBorder(layer));
         }
         map.flyToBounds(bounds, {
           animate:            true,
@@ -1349,10 +1360,10 @@
         });
       } else if (!alreadyCentered) {
         if (noInfoVisible) {
-          map.once('moveend', () => { openPanel(); flashLayerBorder(layer); });
+          queueMoveend(() => { openPanel(); flashLayerBorder(layer); });
         } else {
           openPanel();
-          map.once('moveend', () => flashLayerBorder(layer));
+          queueMoveend(() => flashLayerBorder(layer));
         }
         flySelectionIntoVisibleArea(bounds.getCenter(), 1.0);
       } else {
@@ -1382,8 +1393,16 @@
   function clearSidebarSearch() {
     if (!areaSearchEl) return;
     areaSearchEl.value = '';
+    syncSearchClearVisibility();
     filterSidebar();
     areaSearchEl.focus();
+  }
+
+  // Show the clear (✕) button only when there's text to clear
+  function syncSearchClearVisibility() {
+    const wrap = areaSearchEl?.closest('.search-input-wrapper');
+    if (!wrap) return;
+    wrap.classList.toggle('has-value', Boolean(areaSearchEl.value));
   }
 
   function filterSidebar() {
@@ -1489,6 +1508,14 @@
           },
 
           onEachFeature: (_feature, layer) => {
+            // Hover hint on the map (desktop only — mobile has no hover state)
+            layer.on('mouseover', () => {
+              if (!isMobileView()) applyHoverHighlight(layer);
+            });
+            layer.on('mouseout', () => {
+              if (!isMobileView()) clearHoverHighlight();
+            });
+
             layer.on('click', (e) => {
               L.DomEvent.stopPropagation(e);
               setCompactMode(true);
@@ -1556,7 +1583,7 @@
   // ── 19. EVENT WIRING ─────────────────────────────────────────
 
   // Search
-  areaSearchEl?.addEventListener('input',  filterSidebar);
+  areaSearchEl?.addEventListener('input',  () => { syncSearchClearVisibility(); filterSidebar(); });
   areaSearchEl?.addEventListener('focus',  () => setCompactMode(true));
   searchClearEl?.addEventListener('click', clearSidebarSearch);
 
@@ -1593,22 +1620,29 @@
       return;
     }
 
-    // Image carousel next button
-    const nextBtn = e.target.closest('.mmcard__image-next');
-    if (nextBtn) {
-      const wrap = nextBtn.closest('.mmcard__image-wrap');
+    // Image carousel nav buttons (prev or next)
+    const navBtn = e.target.closest('.mmcard__image-nav');
+    if (navBtn) {
+      const wrap = navBtn.closest('.mmcard__image-wrap');
       const img  = wrap?.querySelector('.mmcard__image');
       if (!wrap || !img) return;
 
-      const urls = (nextBtn.dataset.images || '')
+      const urls = (navBtn.dataset.images || '')
         .split('|')
         .filter(Boolean)
         .map(decodeURIComponent);
       if (urls.length < 2) return;
 
-      const next = (Number(wrap.dataset.carouselIndex || 0) + 1) % urls.length;
+      const direction = Number(navBtn.dataset.direction || 1);
+      const cur  = Number(wrap.dataset.carouselIndex || 0);
+      const next = (cur + direction + urls.length) % urls.length;
       wrap.dataset.carouselIndex = String(next);
       img.src = urls[next];
+
+      // Sync dot indicators
+      wrap.querySelectorAll('.mmcard__image-dot').forEach((dot, i) => {
+        dot.classList.toggle('is-active', i === next);
+      });
     }
   });
 
@@ -1638,6 +1672,6 @@
   syncResponsiveSidebarState();
   setInitialMapExtent();
   loadAllFromSingleService();
-  showInfoHint();
+  showInfoHint({ persistent: true });
 
 })();
