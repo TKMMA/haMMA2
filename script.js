@@ -403,7 +403,9 @@
     info.classList.toggle('active',       isInfoView);
 
     // ── Schedule fly-to after sheet settles ─────────────────────
-    if (isInfoView && nextState === 'info-half' && !opts.skipRecentre) {
+    const shouldRecentreInfoHalf = isInfoView && nextState === 'info-half' && !opts.skipRecentre;
+    const returningFromFullToHalf = prevState === 'info-full' && nextState === 'info-half';
+    if (shouldRecentreInfoHalf || returningFromFullToHalf) {
       scheduleMobileFly(activeLastBounds, activeLastLatlng);
     }
   }
@@ -606,6 +608,31 @@
     return map.getBoundsZoom(bounds, false, L.point(getLeftOverlayWidth() + 30, 30));
   }
 
+  function getMobileVisibleMapStrip() {
+    const mapRect = map.getContainer().getBoundingClientRect();
+    const stageRect = paneStageEl?.getBoundingClientRect();
+    const sheetTop = stageRect ? Math.max(mapRect.top, stageRect.top) : (mapRect.top + mapRect.height * 0.5);
+    const sidePadding = 16;
+    const topPadding = 10;
+    const bottomPadding = 8;
+    const left = sidePadding;
+    const right = Math.max(left + 40, mapRect.width - sidePadding);
+    const top = topPadding;
+    const bottom = Math.max(top + 24, (sheetTop - mapRect.top) - bottomPadding);
+    const width = Math.max(40, right - left);
+    const height = Math.max(24, bottom - top);
+    return {
+      left,
+      right,
+      top,
+      bottom,
+      width,
+      height,
+      centerX: left + (width / 2),
+      centerY: top + (height / 2),
+    };
+  }
+
   function featureFitsVisibleArea(bounds, padding = 30) {
     const rect = getVisibleMapRect(padding);
     const nw   = map.latLngToContainerPoint(bounds.getNorthWest());
@@ -654,35 +681,24 @@
 
     const screenW = map.getSize().x;
     const screenH = map.getSize().y;
-
-    // ── Where on screen do we want the polygon to land? ───────────
-    // Centre of the visible strip = above the sheet top, below the brand panel.
-    const SHEET_TOP_FRACTION = {
-      'hidden':    0.92,
-      'list-open': 0.50,
-      'list-full': 0.08,
-      'info-half': 0.50,
-      'info-full': 0.08,
-    };
-    const sheetTopY = screenH * (SHEET_TOP_FRACTION[mobileState] ?? 0.50);
-    // Brand panel is inside the sheet on mobile, so getBoundingClientRect()
-    // is unreliable while the sheet is translated. Use a fixed offset:
-    // brand panel = 58px (--sheet-banner-h) + 10px top margin = 68px.
-    const brandBot  = 68;
-    const stripTop  = brandBot + 8;
-    const stripCenterY = (stripTop + sheetTopY) / 2;
+    const strip = getMobileVisibleMapStrip();
+    if (!strip) return;
+    const stripCenterY = strip.centerY;
     const stripCenterX = screenW / 2;
 
     // ── Pick a zoom that fits the polygon in the visible strip ────
     let targetZoom = map.getZoom();
     if (bounds) {
-      const stripH = sheetTopY - stripTop;
-      const stripW = screenW - 40; // 20px side padding
+      if (mobileState === 'info-full' && strip.height < 120) {
+        return;
+      }
+      const stripH = strip.height;
+      const stripW = strip.width;
       // Use a synthetic point as padding to fit-zoom into our strip
       targetZoom = map.getBoundsZoom(
         bounds,
         false,
-        L.point(Math.max(40, screenW - stripW), Math.max(40, screenH - stripH)),
+        L.point(Math.max(32, screenW - stripW), Math.max(32, screenH - stripH)),
       );
       // Clamp to map's zoom range (imagery has no detail past ~17–18)
       const maxZ = map.getMaxZoom?.() ?? 18;
@@ -713,6 +729,17 @@
       _flyTimer = null;
       flyToMobileVisible(bounds, latlng);
     }, delay);
+  }
+
+  function getBoundsForFeatures(features) {
+    if (!features?.length) return null;
+    try {
+      const fc = { type: 'FeatureCollection', features };
+      const bounds = L.geoJSON(fc).getBounds();
+      return bounds?.isValid?.() ? bounds : null;
+    } catch (_err) {
+      return null;
+    }
   }
 
   // Point-in-polygon using ray casting
@@ -1109,9 +1136,7 @@
   // ── 15. INFO PANEL — OPEN / CLOSE ────────────────────────────
   function openInfoPanel(latlng, features, options = {}) {
     activeLastLatlng  = latlng || null;
-    if (options.source !== 'menu') {
-      activeLastBounds = null;
-    }
+    activeLastBounds = getBoundsForFeatures(features);
 
     const isMulti   = features.length > 1;
     const areaName  = getVal(features[0].properties, 'Full_name') ||
@@ -1174,6 +1199,16 @@
     if (options.source === 'map' && latlng) {
       clearAccordionSelectionHighlight();
       updateClickMarker(latlng);
+      if (!isMobileView() && activeLastBounds) {
+        const leftWidth = getLeftOverlayWidth();
+        map.fitBounds(activeLastBounds, {
+          animate: true,
+          duration: 0.7,
+          paddingTopLeft: [Math.max(24, leftWidth + 24), 24],
+          paddingBottomRight: [24, 24],
+          maxZoom: 14,
+        });
+      }
     }
   }
 
