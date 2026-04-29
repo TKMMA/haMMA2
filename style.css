@@ -40,8 +40,8 @@
   --color-prohibited:      #a01f1f;
   --color-error:           #c0392b;
   --color-error-bg:        #fdf3f2;
-  --color-brand-accordion:       #3f6f89;
-  --color-brand-accordion-hover: #cfe0ed;
+  --color-brand-accordion:       #5f88a1;
+  --color-brand-accordion-hover: #7aa0b8;
   --color-text-accordion:        #1e3f52;
   --color-text-notice:           #1e3040;
 
@@ -236,7 +236,7 @@ a {
   display: flex;
   align-items: center;
   background: var(--color-surface-search);
-  border-bottom: 1px solid var(--color-border-brand);
+  border-bottom: none;
   flex-shrink: 0;
 }
 
@@ -250,7 +250,7 @@ a {
   padding: 8px 56px 8px 12px;
   border-radius: var(--border-radius-pill);
   border: 1px solid var(--color-border-brand);
-  font-size: 13px;
+  font-size: 16px;
   font-family: var(--font);
   color: var(--color-text-primary);
   background: var(--color-surface-tint);
@@ -305,6 +305,10 @@ a {
 .search-clear-btn:hover {
   color: var(--color-text-primary);
   background: rgba(0, 0, 0, 0.06);
+}
+
+@media (min-width: 861px) {
+  #area-search { font-size: 13px; }
 }
 
 
@@ -605,11 +609,12 @@ a {
   z-index: 5;
   min-height: var(--top-band-height);
   background: var(--color-surface-search);
-  border-bottom: 1px solid var(--color-border-brand);
+  border-bottom: none;
   border-top-left-radius: var(--border-radius-lg);
   border-top-right-radius: var(--border-radius-lg);
   flex-shrink: 0;
   overflow: hidden;
+  padding: 0 12px;
 }
 
 /* Default single-area header — centred label */
@@ -634,12 +639,13 @@ a {
   display: flex;
   flex-direction: column;
   width: 100%;
-  border: none;
-  background: none;
+  border: 1px solid var(--color-border-brand);
+  border-radius: var(--border-radius-md);
+  background: var(--color-surface-search);
   cursor: pointer;
   padding: 0;
   font-family: var(--font);
-  text-align: left;
+  text-align: center;
 }
 
 .mmpopup__header--toggle:hover .mmpopup__summary-trigger {
@@ -655,7 +661,7 @@ a {
 .mmpopup__header-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 8px 14px;
   min-height: var(--top-band-height);
   gap: 10px;
@@ -665,11 +671,10 @@ a {
 .mmpopup__summary-trigger {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 10px;
-  padding: 9px 14px;
+  padding: 10px 14px;
   background: var(--color-brand-accordion);
-  border-top: 1px solid rgba(0,0,0,0.08);
   transition: background var(--duration-fast);
 }
 
@@ -685,6 +690,26 @@ a {
   color: rgba(255,255,255,0.85);
   transition: transform 0.25s ease;
   flex-shrink: 0;
+}
+
+.mmpopup__summary-context-list {
+  display: none;
+  margin: 0;
+  padding: 0 14px 10px 30px;
+  list-style: disc;
+  background: var(--color-brand-accordion);
+}
+
+.mmpopup__summary-context-item {
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.35;
+  text-align: left;
+}
+
+.mmpopup__header--toggle[aria-expanded="true"] .mmpopup__summary-context-list {
+  display: block;
 }
 
 /* Rotate chevron when expanded */
@@ -709,12 +734,13 @@ a {
 }
 
 .mmpopup__scroll {
+  scroll-padding-top: 0;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
-  padding: 10px 12px;
+  padding: 0 12px 10px;
 }
 
 .mmpopup__scroll::-webkit-scrollbar { width: 5px; }
@@ -792,16 +818,23 @@ a {
 }
 
 .mmcard--summary {
-  border: 2px solid var(--color-brand-accordion);
+  border: 1px solid var(--color-border-brand);
+  border-top: none;
   background: var(--color-surface-search);
+  color: var(--color-text-primary);
+  margin-bottom: 14px !important;
 }
 
 .mmcard--summary .mm-bullet-text {
-  color: var(--color-brand-dark);
-  font-weight: 600;
+  color: var(--color-text-primary);
+  font-weight: 500;
 }
 
 .mmcard__body { padding: 14px; }
+
+.mmcard__body--summary {
+  padding-top: 0;
+}
 
 .mmcard__title {
   font-size: 16px;
@@ -1188,6 +1221,7 @@ a {
 
   /* Safe-area scroll padding */
   .mmpopup__scroll {
+    scroll-padding-top: 0;
     padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
 
@@ -1218,11 +1252,11 @@ a {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 5px;
+    justify-content: flex-start;
+    gap: 6px;
     cursor: grab;
     touch-action: none;
-    padding: 6px 0;
+    padding: 0;
     user-select: none;
     -webkit-user-select: none;
     position: relative;
@@ -1254,6 +1288,7 @@ a {
     position: relative;
     z-index: 1;
     flex-shrink: 0;
+    margin-top: -13px;
   }
 
   .sheet-banner__grip::after {
@@ -1326,11 +1361,7 @@ a {
     z-index: 998;
   }
 
-  /* Leaflet zoom — above banner */
-  .leaflet-bottom.leaflet-right {
-    bottom: calc(var(--sheet-banner-h) + 12px);
-    right: 10px;
-  }
+  .leaflet-control-zoom { display: none !important; }
 
 }
 
@@ -1362,3 +1393,10 @@ a {
 /* component classes like .field-stack { display: grid }. This mirrors the  */
 /* rule used in every major CSS reset (normalize.css, sanitize.css, etc.)   */
 [hidden] { display: none !important; }
+
+
+.mmcard--summary .summary-section-title,
+.mmcard--summary .area-label,
+.mmcard--summary .rule-rich-text {
+  color: var(--color-text-primary);
+}

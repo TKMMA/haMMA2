@@ -900,6 +900,15 @@
       </div>`).join('');
   }
 
+  function buildAreaNamesPlainList(features) {
+    return features.map((f) => `
+      <li class="mmpopup__summary-context-item">${escapeHtml(
+        getVal(f.properties, 'Full_name') ||
+        getVal(f.properties, 'Full_Name') ||
+        'Unknown Area',
+      )}</li>`).join('');
+  }
+
   // Summary card block — driven by SUMMARY_SCHEMA so it stays in sync
   // with the rules tab automatically
   function buildSummaryBlock(title, fieldKey, features) {
@@ -928,13 +937,8 @@
     return `
       <div class="summary-accordion__panel--inline" hidden>
         <div class="area-section mmcard mmcard--summary" style="border-top-left-radius:0;border-top-right-radius:0;margin-bottom:0;">
-          <div class="mmcard__body">
-            <h3 class="mmcard__title">Fishing Rules Summary</h3>
-            <span class="mmcard__subtitle-label">Managed areas at this location:</span>
-            <div class="mmcard__subtitle">${buildAreaNamesList(features)}</div>
-            <div class="mmtabs">
-              <button class="active" type="button">CONSOLIDATED RULES</button>
-            </div>
+          <div class="mmcard__body mmcard__body--summary">
+           <div class="mmcard__subtitle">${buildAreaNamesList(features)}</div>
             <div class="tab-pane summary-field-stack">
               ${SUMMARY_SCHEMA.map((s) => buildSummaryBlock(s.title, s.fieldKey, features)).join('')}
             </div>
@@ -1068,13 +1072,26 @@
     const label = btn.querySelector('.mmpopup__summary-trigger-label');
     if (label) {
       label.textContent = expand
-        ? 'Hide consolidated fishing rules'
-        : 'See consolidated fishing rules summary';
+        ? 'Fishing Rules Summary for:'
+        : 'Show consolidated fishing rules summary';
     }
   }
 
   function toggleSummaryAccordion(btn) {
     const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+    if (!isExpanded) {
+      btn.dataset.userExpanded = 'true';
+      const scroll = btn.closest('.mmpopup')?.querySelector('.mmpopup__scroll');
+      if (scroll && scroll.scrollTop > 0) {
+        btn.dataset.pendingExpand = 'true';
+        scroll.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      btn.dataset.pendingExpand = 'false';
+    } else {
+      btn.dataset.userExpanded = 'false';
+      btn.dataset.pendingExpand = 'false';
+    }
     setSummaryExpanded(btn, !isExpanded);
   }
 
@@ -1086,13 +1103,15 @@
   function openInfoPanel(latlng, features, options = {}) {
     // Store for re-centring after resize / state change
     activeLastLatlng  = latlng || null;
-    activeLastBounds  = null; // set by zoomToArea for list selections
+    if (options.source !== 'menu') {
+      activeLastBounds = null; // preserved for menu selections (mobile fit+zoom)
+    }
 
     const isMulti     = features.length > 1;
     const headerTitle = isMulti ? `${features.length} Areas Selected` : '1 Area Selected';
     const cardsHtml   = features.map((f, i) => buildAreaCard(f, `area-${i}`)).join('');
     const dividerHtml = isMulti
-      ? '<div class="section-divider">Detailed area information below</div>'
+      ? ''
       : '';
 
     // Multi-area: header becomes the summary accordion trigger.
@@ -1108,24 +1127,16 @@
              <span class="mmpopup__header-title">${headerTitle}</span>
            </div>
            <div class="mmpopup__summary-trigger">
-             <span class="mmpopup__summary-trigger-label">See consolidated fishing rules summary</span>
+             <span class="mmpopup__summary-trigger-label">Show consolidated fishing rules summary</span>
              <span class="mmpopup__summary-trigger-chevron" aria-hidden="true">▼</span>
            </div>
+           <ul class="mmpopup__summary-context-list">
+             ${buildAreaNamesPlainList(features)}
+           </ul>
          </button>`
       : `<div class="mmpopup__header-inner">
            <span class="mmpopup__header-title">${headerTitle}</span>
          </div>`;
-
-    // Single statewide-regs reminder at top of scroll (was previously
-    // duplicated inside every area card and inside the summary panel).
-    const stateRegsUrl =
-      getVal(features[0].properties, 'State_Fishing_Regs_URL') || FALLBACK_REGS_URL;
-    const stateNoticeHtml = `
-      <div class="mm-statewide-notice mm-statewide-notice--top">
-        Reminder: All
-        <a href="${escapeHtml(stateRegsUrl)}" target="_blank" rel="noopener">Statewide Fishing Regulations</a>
-        still apply here.
-      </div>`;
 
     // Summary panel is now just the card content (no outer accordion wrapper)
     // — the trigger lives in the header above
@@ -1136,21 +1147,52 @@
         <div class="mmpopup__header">${headerHtml}</div>
         <div class="mmpopup__scroll">
           ${summaryPanelHtml}
-          ${stateNoticeHtml}
           ${dividerHtml}
           ${cardsHtml}
         </div>
       </div>`;
 
     const scrollEl = infoContentEl.querySelector('.mmpopup__scroll');
-    if (scrollEl) scrollEl.scrollTop = 0;
+    if (scrollEl) {
+      scrollEl.scrollTop = 0;
+      if (isMulti) {
+        const toggleBtn = infoContentEl.querySelector('[data-action="toggle-summary"]');
+        const panelEl = infoContentEl.querySelector('.summary-accordion__panel--inline');
+        let collapsedFromScroll = false;
+        scrollEl.addEventListener('scroll', () => {
+          if (!toggleBtn || !panelEl) return;
+          if (toggleBtn.dataset.pendingExpand === 'true' && scrollEl.scrollTop <= 2) {
+            toggleBtn.dataset.pendingExpand = 'false';
+            setSummaryExpanded(toggleBtn, true);
+            collapsedFromScroll = false;
+            return;
+          }
+          if (toggleBtn.getAttribute('aria-expanded') !== 'true') {
+            if (
+              collapsedFromScroll &&
+              toggleBtn.dataset.userExpanded === 'true' &&
+              scrollEl.scrollTop <= Math.max(2, (panelEl.offsetTop + panelEl.offsetHeight) - 24)
+            ) {
+              setSummaryExpanded(toggleBtn, true);
+              collapsedFromScroll = false;
+            }
+            return;
+          }
+          const threshold = panelEl.offsetTop + panelEl.offsetHeight;
+          if (!collapsedFromScroll && scrollEl.scrollTop > threshold) {
+            setSummaryExpanded(toggleBtn, false);
+            collapsedFromScroll = true;
+          }
+        }, { passive: true });
+      }
+    }
 
     // Update info banner title if area name is available
     const infoBannerTitle = document.getElementById('info-banner-title');
     if (infoBannerTitle) {
       infoBannerTitle.textContent = features.length === 1
         ? (getVal(features[0].properties, 'Full_name') || getVal(features[0].properties, 'Full_Name') || 'Area Info')
-        : `${features.length} Areas`;
+        : `${features.length} Areas Selected`;
     }
 
     if (isMobileView()) {
@@ -1161,6 +1203,11 @@
 
     hasEverSelected = true;
     hideInfoHint();
+
+    if (options.source === 'menu' && activeSelectionMarker) {
+      map.removeLayer(activeSelectionMarker);
+      activeSelectionMarker = null;
+    }
 
     if (options.source === 'map' && latlng) {
       clearAccordionSelectionHighlight();
