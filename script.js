@@ -327,8 +327,12 @@
     const info  = infoSidebarEl;
     if (!stage || !list || !info) return;
 
-    const isInfoView = nextState === 'info-half' || nextState === 'info-full';
-    const wasInfoView = prevState === 'info-half' || prevState === 'info-full';
+    // 'hidden' from the info drag zone means info-pane collapsed, NOT a pane switch.
+    // Preserve is-info-view if we're collapsing from an info state.
+    const wasInfoView = prevState === 'info-half' || prevState === 'info-full' ||
+                        (prevState === 'hidden' && stage.classList.contains('is-info-view'));
+    const isInfoView  = nextState === 'info-half' || nextState === 'info-full' ||
+                        (nextState === 'hidden' && wasInfoView);
 
     // ── Remember list state when transitioning into info view ──
     if (!wasInfoView && isInfoView) {
@@ -360,6 +364,10 @@
     list.classList.toggle('is-collapsed', yState === 'hidden');
 
     // ── Info panel visibility ───────────────────────────────────
+    // Keep the info panel active (visible, interactive) whenever we're in
+    // info-view — including the collapsed 'hidden' state — so the banner
+    // tab remains tappable to restore. Only mark offscreen when fully on
+    // the list side.
     info.classList.toggle('is-offscreen', !isInfoView);
     info.classList.toggle('active',       isInfoView);
 
@@ -419,7 +427,7 @@
 
   // Snap states available from each view
   const LIST_SNAPS = ['hidden', 'list-open', 'list-full'];
-  const INFO_SNAPS = ['list-open', 'info-half', 'info-full'];
+  const INFO_SNAPS = ['hidden', 'info-half', 'info-full'];
 
   let _drag = null; // active drag session
 
@@ -503,6 +511,15 @@
     zone.addEventListener('touchmove',   onBannerDragMove,  { passive: false });
     zone.addEventListener('touchend',    onBannerDragEnd,   { passive: false });
     zone.addEventListener('touchcancel', onBannerDragEnd,   { passive: false });
+
+    // Tap (no drag) on the info banner when collapsed → restore to info-half
+    if (panel === 'info') {
+      zone.addEventListener('click', () => {
+        if (mobileState === 'hidden' && paneStageEl?.classList.contains('is-info-view')) {
+          applyMobileState('info-half');
+        }
+      });
+    }
   }
 
 
@@ -833,6 +850,9 @@
     setActiveAreaItem(null, null);
 
     if (isMobileView()) {
+      // Explicitly clear is-info-view before applying list state so the
+      // x-position snaps back to the list pane (not the info-hidden state).
+      paneStageEl?.classList.remove('is-info-view');
       applyMobileState('list-open');
     } else {
       closeInfoPanel();
