@@ -1066,7 +1066,7 @@
     const label = btn.querySelector('.mmpopup__summary-trigger-label');
     if (label) {
       label.textContent = expand
-        ? 'Fishing Rules Summary'
+        ? 'Fishing Rules Summary for:'
         : 'Show consolidated fishing rules summary';
     }
   }
@@ -1074,10 +1074,17 @@
   function toggleSummaryAccordion(btn) {
     const isExpanded = btn.getAttribute('aria-expanded') === 'true';
     if (!isExpanded) {
+      btn.dataset.userExpanded = 'true';
       const scroll = btn.closest('.mmpopup')?.querySelector('.mmpopup__scroll');
       if (scroll && scroll.scrollTop > 0) {
+        btn.dataset.pendingExpand = 'true';
         scroll.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
       }
+      btn.dataset.pendingExpand = 'false';
+    } else {
+      btn.dataset.userExpanded = 'false';
+      btn.dataset.pendingExpand = 'false';
     }
     setSummaryExpanded(btn, !isExpanded);
   }
@@ -1090,7 +1097,9 @@
   function openInfoPanel(latlng, features, options = {}) {
     // Store for re-centring after resize / state change
     activeLastLatlng  = latlng || null;
-    activeLastBounds  = null; // set by zoomToArea for list selections
+    if (options.source !== 'menu') {
+      activeLastBounds = null; // preserved for menu selections (mobile fit+zoom)
+    }
 
     const isMulti     = features.length > 1;
     const headerTitle = isMulti ? `${features.length} Areas Selected` : '1 Area Selected';
@@ -1143,8 +1152,21 @@
         let collapsedFromScroll = false;
         scrollEl.addEventListener('scroll', () => {
           if (!toggleBtn || !panelEl) return;
-          if (toggleBtn.getAttribute('aria-expanded') !== 'true') {
+          if (toggleBtn.dataset.pendingExpand === 'true' && scrollEl.scrollTop <= 2) {
+            toggleBtn.dataset.pendingExpand = 'false';
+            setSummaryExpanded(toggleBtn, true);
             collapsedFromScroll = false;
+            return;
+          }
+          if (toggleBtn.getAttribute('aria-expanded') !== 'true') {
+            if (
+              collapsedFromScroll &&
+              toggleBtn.dataset.userExpanded === 'true' &&
+              scrollEl.scrollTop <= Math.max(2, (panelEl.offsetTop + panelEl.offsetHeight) - 24)
+            ) {
+              setSummaryExpanded(toggleBtn, true);
+              collapsedFromScroll = false;
+            }
             return;
           }
           const threshold = panelEl.offsetTop + panelEl.offsetHeight;
