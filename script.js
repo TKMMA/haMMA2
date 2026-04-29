@@ -103,11 +103,9 @@
   let activeSelectionMarker  = null;
   let activeAccordionLayer   = null;
   let activeHoverLayer       = null;
-  let activeAreaSelection    = null; // eslint-disable-line no-unused-vars
   let infoHintEl             = null;
   let infoHintTimer          = null;
   let hasEverSelected        = false;
-  let isCompactMode          = false; // eslint-disable-line no-unused-vars
   let activeLastLatlng       = null;  // last latlng used to open the info panel
   let _flyTimer              = null;  // pending mobile fly-to timer
 
@@ -244,11 +242,9 @@
 
 
   // ── 6. COMPACT MODE ──────────────────────────────────────────
-  // Collapse the brand panel when the user interacts with the map or search.
-  // FIX: original setCompactMode() ignored its argument and always set false.
-  function setCompactMode(val) {
-    isCompactMode = Boolean(val);
-    brandPanelEl?.classList.toggle('compact', isCompactMode);
+  // Shrinks the brand panel slightly when the user interacts with the map.
+  function setCompactMode(on) {
+    brandPanelEl?.classList.toggle('compact', Boolean(on));
   }
 
 
@@ -309,7 +305,6 @@
     if (state === 'hidden')    return H * 0.92 - bh;
     if (state === 'list-open') return H * 0.50 - bh;
     if (state === 'list-full') return H * 0.08;
-    if (state === 'info-closed') return H * 0.92 - bh;
     if (state === 'info-half') return H * 0.50 - bh;
     if (state === 'info-full') return H * 0.08;
     return H * 0.92 - bh;
@@ -353,7 +348,7 @@
     }
 
     stage.classList.remove('is-hidden', 'is-open', 'is-full');
-    if (yState === 'hidden' || yState === 'info-closed') {
+    if (yState === 'hidden') {
       stage.classList.add('is-hidden');
     } else if (yState === 'list-open' || yState === 'info-half') {
       stage.classList.add('is-open');
@@ -513,13 +508,11 @@
 
   // ── 9. ACTIVE AREA SELECTION ─────────────────────────────────
   function setActiveAreaItem(islandName, areaName) {
-    activeAreaSelection = islandName && areaName ? { islandName, areaName } : null;
-
     document.querySelectorAll('.area-item.active-area').forEach((el) => {
       el.classList.remove('active-area');
     });
 
-    if (!activeAreaSelection) return;
+    if (!islandName || !areaName) return;
 
     document.querySelectorAll('.area-item').forEach((el) => {
       if (el.dataset.island === islandName && el.dataset.area === areaName) {
@@ -624,9 +617,11 @@
       'info-full': 0.08,
     };
     const sheetTopY = screenH * (SHEET_TOP_FRACTION[mobileState] ?? 0.50);
-    const brandBot  = (brandPanelEl?.getBoundingClientRect().bottom || 70)
-                    - map.getContainer().getBoundingClientRect().top;
-    const stripTop  = brandBot + 16;
+    // Brand panel is inside the sheet on mobile, so getBoundingClientRect()
+    // is unreliable while the sheet is translated. Use a fixed offset instead:
+    // brand panel ≈ 52px tall + 10px top margin = 62px from viewport top.
+    const brandBot  = 62;
+    const stripTop  = brandBot + 8;
     const stripCenterY = (stripTop + sheetTopY) / 2;
     const stripCenterX = screenW / 2;
 
@@ -798,12 +793,11 @@
   }
 
   function showInfoHint(opts = {}) {
+    if (isMobileView()) return; // hint is map-level UI, not relevant when map is behind the sheet
     const el = ensureInfoHint();
     if (!el) return;
     if (infoHintTimer) { clearTimeout(infoHintTimer); infoHintTimer = null; }
     el.classList.add('active');
-    // Persistent hint (e.g. first-time onboarding) doesn't auto-dismiss —
-    // it stays up until the user either dismisses it or makes a selection.
     if (opts.persistent) return;
     infoHintTimer = setTimeout(() => {
       el.classList.remove('active');
@@ -887,27 +881,6 @@
       .join('');
   }
 
-  function buildAreaNamesList(features) {
-    return features.map((f) => `
-      <div class="mm-bullet-container">
-        <span class="mm-bullet-point">•</span>
-        <span class="mm-bullet-text">${escapeHtml(
-          getVal(f.properties, 'Full_name') ||
-          getVal(f.properties, 'Full_Name') ||
-          'Unknown Area',
-        )}</span>
-      </div>`).join('');
-  }
-
-  function buildAreaNamesPlainList(features) {
-    return features.map((f) => `
-      <li class="mmpopup__summary-context-item">${escapeHtml(
-        getVal(f.properties, 'Full_name') ||
-        getVal(f.properties, 'Full_Name') ||
-        'Unknown Area',
-      )}</li>`).join('');
-  }
-
   // Summary card block — driven by SUMMARY_SCHEMA so it stays in sync
   // with the rules tab automatically
   function buildSummaryBlock(title, fieldKey, features) {
@@ -933,11 +906,17 @@
   // Build just the collapsible panel content — the trigger button now lives
   // in the mmpopup header so it's always visible regardless of scroll position.
   function buildSummaryPanel(features) {
+    const areaListHtml = features.map((f) => {
+      const name = getVal(f.properties, 'Full_name') || getVal(f.properties, 'Full_Name') || 'Unknown Area';
+      return `<li class="summary-area-name">${escapeHtml(name)}</li>`;
+    }).join('');
+
     return `
       <div class="summary-accordion__panel--inline" hidden>
-        <div class="area-section mmcard mmcard--summary" style="border-top-left-radius:0;border-top-right-radius:0;margin-bottom:0;">
+        <div class="mmcard mmcard--summary">
           <div class="mmcard__body mmcard__body--summary">
-            <div class="tab-pane summary-field-stack">
+            <ul class="summary-area-list">${areaListHtml}</ul>
+            <div class="summary-field-stack">
               ${SUMMARY_SCHEMA.map((s) => buildSummaryBlock(s.title, s.fieldKey, features)).join('')}
             </div>
           </div>
@@ -1069,126 +1048,73 @@
 
     const label = btn.querySelector('.mmpopup__summary-trigger-label');
     if (label) {
-      label.textContent = expand
-        ? 'Fishing Rules Summary for:'
-        : 'Show consolidated fishing rules summary';
+      label.textContent = expand ? 'Hide combined rules' : 'Show combined fishing rules';
     }
   }
 
   function toggleSummaryAccordion(btn) {
     const isExpanded = btn.getAttribute('aria-expanded') === 'true';
-    if (!isExpanded) {
-      btn.dataset.userExpanded = 'true';
-      const scroll = btn.closest('.mmpopup')?.querySelector('.mmpopup__scroll');
-      if (scroll && scroll.scrollTop > 0) {
-        btn.dataset.pendingExpand = 'true';
-        scroll.scrollTo({ top: 0, behavior: 'smooth' });
-        return;
-      }
-      btn.dataset.pendingExpand = 'false';
-    } else {
-      btn.dataset.userExpanded = 'false';
-      btn.dataset.pendingExpand = 'false';
-    }
     setSummaryExpanded(btn, !isExpanded);
   }
 
-  // No-op kept for compatibility
-  function collapseSummaryAccordion() {}
 
 
   // ── 15. INFO PANEL — OPEN / CLOSE ────────────────────────────
   function openInfoPanel(latlng, features, options = {}) {
-    // Store for re-centring after resize / state change
     activeLastLatlng  = latlng || null;
     if (options.source !== 'menu') {
-      activeLastBounds = null; // preserved for menu selections (mobile fit+zoom)
+      activeLastBounds = null;
     }
 
-    const isMulti     = features.length > 1;
-    const headerTitle = isMulti
-      ? `${features.length} Areas Selected`
-      : (getVal(features[0].properties, 'Full_name') || getVal(features[0].properties, 'Full_Name') || '1 Area Selected');
-    const cardsHtml   = features.map((f, i) => buildAreaCard(f, `area-${i}`)).join('');
+    const isMulti   = features.length > 1;
+    const areaName  = getVal(features[0].properties, 'Full_name') ||
+                      getVal(features[0].properties, 'Full_Name') ||
+                      'Area Info';
+    const count     = features.length;
+    const cardsHtml = features.map((f, i) => buildAreaCard(f, `area-${i}`)).join('');
 
-    // Multi-area: header becomes the summary accordion trigger.
-    // Single area: plain centred label.
-    const headerHtml = isMulti
-      ? `<button
-           class="mmpopup__header--toggle"
-           type="button"
-           aria-expanded="false"
-           data-action="toggle-summary"
-         >
-           <div class="mmpopup__header-row">
-             <span class="mmpopup__header-title">${headerTitle}</span>
-           </div>
-           <div class="mmpopup__summary-trigger">
-             <span class="mmpopup__summary-trigger-label">Show consolidated fishing rules summary</span>
-             <span class="mmpopup__summary-trigger-chevron" aria-hidden="true">▼</span>
-           </div>
-           <ul class="mmpopup__summary-context-list">
-             ${buildAreaNamesPlainList(features)}
-           </ul>
-         </button>`
-      : `<div class="mmpopup__header-inner">
-           <span class="mmpopup__header-title">${escapeHtml(headerTitle)}</span>
-         </div>`;
+    // Multi-area: popup header doubles as the summary accordion trigger.
+    // Single area: no popup header — the panel header already shows the name.
+    const popupHeaderHtml = isMulti
+      ? `<div class="mmpopup__header">
+           <button
+             class="mmpopup__header--toggle"
+             type="button"
+             aria-expanded="false"
+             data-action="toggle-summary"
+           >
+             <div class="mmpopup__header-row">
+               <span class="mmpopup__header-title">${count} Areas at This Location</span>
+             </div>
+             <div class="mmpopup__summary-trigger">
+               <span class="mmpopup__summary-trigger-label">Show combined fishing rules</span>
+               <span class="mmpopup__summary-trigger-chevron" aria-hidden="true">▼</span>
+             </div>
+           </button>
+         </div>`
+      : '';
 
-    // Summary panel is now just the card content (no outer accordion wrapper)
-    // — the trigger lives in the header above
     const summaryPanelHtml = isMulti ? buildSummaryPanel(features) : '';
 
     infoContentEl.innerHTML = `
       <div class="mmpopup">
-        <div class="mmpopup__header">${headerHtml}</div>
+        ${popupHeaderHtml}
         <div class="mmpopup__scroll">
           ${summaryPanelHtml}
           ${cardsHtml}
         </div>
       </div>`;
 
-    const scrollEl = infoContentEl.querySelector('.mmpopup__scroll');
-    if (scrollEl) {
-      scrollEl.scrollTop = 0;
-      if (isMulti) {
-        const toggleBtn = infoContentEl.querySelector('[data-action="toggle-summary"]');
-        const panelEl = infoContentEl.querySelector('.summary-accordion__panel--inline');
-        let collapsedFromScroll = false;
-        scrollEl.addEventListener('scroll', () => {
-          if (!toggleBtn || !panelEl) return;
-          if (toggleBtn.dataset.pendingExpand === 'true' && scrollEl.scrollTop <= 2) {
-            toggleBtn.dataset.pendingExpand = 'false';
-            setSummaryExpanded(toggleBtn, true);
-            collapsedFromScroll = false;
-            return;
-          }
-          if (toggleBtn.getAttribute('aria-expanded') !== 'true') {
-            if (
-              collapsedFromScroll &&
-              toggleBtn.dataset.userExpanded === 'true' &&
-              scrollEl.scrollTop <= Math.max(2, (panelEl.offsetTop + panelEl.offsetHeight) - 24)
-            ) {
-              setSummaryExpanded(toggleBtn, true);
-              collapsedFromScroll = false;
-            }
-            return;
-          }
-          const threshold = panelEl.offsetTop + panelEl.offsetHeight;
-          if (!collapsedFromScroll && scrollEl.scrollTop > threshold) {
-            setSummaryExpanded(toggleBtn, false);
-            collapsedFromScroll = true;
-          }
-        }, { passive: true });
-      }
-    }
+    infoContentEl.querySelector('.mmpopup__scroll').scrollTop = 0;
 
-    // Update both the desktop header title and the mobile banner title
-    const titleText = `${features.length} AREA${features.length === 1 ? '' : 'S'} SELECTED`;
+    // Sync the panel header title (desktop) and mobile banner title
+    const panelTitle = isMulti
+      ? `${count} Area${count === 1 ? '' : 's'} Selected`
+      : areaName;
     const desktopTitle = document.getElementById('info-banner-title');
     const mobileTitle  = document.getElementById('info-banner-title-mobile');
-    if (desktopTitle) desktopTitle.textContent = titleText;
-    if (mobileTitle)  mobileTitle.textContent  = titleText;
+    if (desktopTitle) desktopTitle.textContent = panelTitle;
+    if (mobileTitle)  mobileTitle.textContent  = panelTitle;
 
     if (isMobileView()) {
       applyMobileState('info-half');
