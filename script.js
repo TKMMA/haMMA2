@@ -917,33 +917,17 @@
       .join('');
   }
 
-  // Summary card block — driven by SUMMARY_SCHEMA so it stays in sync
-  // with the rules tab automatically
+  // Summary card block — temporary area-by-area rendering.
+  // This keeps overlap and single-area render paths separate while we
+  // prepare for the next-step grouped summary engine.
   function buildSummaryBlock(title, fieldKey, features) {
-    const grouped = {
-      prohibited: new Map(),
-      allowed: new Map(),
-      allowed_limits: new Map(),
-      other: new Map(),
-    };
-
-    features.forEach((f, index) => {
-      const val = getVal(f.properties, fieldKey);
-      if (!val) return;
-      normalizeRuleSegments(val)
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .forEach((line) => {
-          const bucket = classifyRuleLine(line);
-          const key = line.toLowerCase();
-          if (!grouped[bucket].has(key)) grouped[bucket].set(key, { text: line, sources: new Set() });
-          grouped[bucket].get(key).sources.add(index + 1);
-        });
-    });
-
-    const hasAny = SUMMARY_RULE_ORDER.some((k) => grouped[k].size);
-    if (!hasAny) return '';
+    const items = features
+      .map((f) => ({
+        name: getVal(f.properties, 'Full_name') || getVal(f.properties, 'Full_Name'),
+        val:  getVal(f.properties, fieldKey),
+      }))
+      .filter((i) => i.val);
+    if (!items.length) return '';
 
     return `
       <div class="summary-field-block">
@@ -1067,6 +1051,57 @@
       </div>`;
   }
 
+  function renderSingleAreaInfoPane(feature) {
+    return `
+      <div class="mmpopup">
+        <div class="mmpopup__scroll">
+          ${buildAreaCard(feature, 'area-0')}
+        </div>
+      </div>`;
+  }
+
+  function renderOverlapHeader(features) {
+    const count = features.length;
+    return `
+      <div class="overlap-context">
+        <h3 class="overlap-context__title">${count} overlapping areas selected</h3>
+        <p class="overlap-context__copy">Review the combined summary first, then use the source cards below for original rule text.</p>
+      </div>`;
+  }
+
+  function renderAreaSpecificSection(features) {
+    return `
+      <section class="overlap-areas" aria-label="Area-specific rules">
+        <h4 class="overlap-areas__title">Area-specific rules</h4>
+        <p class="overlap-areas__copy">The summary above reorganizes rules by activity. These cards preserve the original rules for each selected area.</p>
+        ${features.map((f, i) => buildAreaCard(f, `area-${i}`)).join('')}
+      </section>`;
+  }
+
+  function renderOverlapInfoPane(features) {
+    const count = features.length;
+    return `
+      <div class="mmpopup">
+        <button
+          class="mmpopup__summary-banner"
+          type="button"
+          aria-expanded="false"
+          data-action="toggle-summary"
+          data-area-count="${count}"
+        >
+          <span class="mmpopup__summary-banner__cta">
+            <span class="mmpopup__summary-trigger-label">${count} Overlapping Areas — See combined fishing rules</span>
+            <span class="mmpopup__summary-trigger-chevron" aria-hidden="true">▼</span>
+          </span>
+        </button>
+        <div class="mmpopup__scroll">
+          ${renderOverlapHeader(features)}
+          ${buildSummaryPanel(features)}
+          ${renderAreaSpecificSection(features)}
+        </div>
+      </div>`;
+  }
+
   // Switch which tab pane is visible within an area card
   function showTab(btn, tabId) {
     const section = btn.closest('.area-section');
@@ -1142,36 +1177,10 @@
     const areaName  = getVal(features[0].properties, 'Full_name') ||
                       getVal(features[0].properties, 'Full_Name') ||
                       'Area Info';
-    const count     = features.length;
-    const cardsHtml = features.map((f, i) => buildAreaCard(f, `area-${i}`)).join('');
-
-    // Multi-area: full-width branded action banner — count + CTA in one row.
-    // Single area: no banner needed.
-    const popupHeaderHtml = isMulti
-      ? `<button
-           class="mmpopup__summary-banner"
-           type="button"
-           aria-expanded="false"
-           data-action="toggle-summary"
-           data-area-count="${count}"
-         >
-           <span class="mmpopup__summary-banner__cta">
-             <span class="mmpopup__summary-trigger-label">${count} Overlapping Areas — See combined fishing rules</span>
-             <span class="mmpopup__summary-trigger-chevron" aria-hidden="true">▼</span>
-           </span>
-         </button>`
-      : '';
-
-    const summaryPanelHtml = isMulti ? buildSummaryPanel(features) : '';
-
-    infoContentEl.innerHTML = `
-      <div class="mmpopup">
-        ${popupHeaderHtml}
-        <div class="mmpopup__scroll">
-          ${summaryPanelHtml}
-          ${cardsHtml}
-        </div>
-      </div>`;
+    const count = features.length;
+    infoContentEl.innerHTML = isMulti
+      ? renderOverlapInfoPane(features)
+      : renderSingleAreaInfoPane(features[0]);
 
     infoContentEl.querySelector('.mmpopup__scroll').scrollTop = 0;
 
