@@ -65,7 +65,7 @@
   --info-panel-width:      var(--sidebar-width);
   --panel-margin:          15px;
   --panel-gap:             calc(var(--panel-margin) + 12px);
-  --panel-stack-offset:    84px;
+  --panel-stack-offset:    0px;
   --top-band-height:       50px;
   --sheet-handle-height:   48px;
   --border-radius-sm:      6px;
@@ -141,15 +141,13 @@ a {
 
 /* ── 5. BRAND PANEL ─────────────────────────────────────────── */
 .brand-panel {
-  position: absolute;
-  top: var(--panel-margin);
-  left: var(--panel-margin);
-  width: var(--sidebar-width);
+  position: relative;
+  width: 100%;
   background: linear-gradient(135deg, var(--color-brand-darkest), var(--color-brand-mid));
-  border-radius: var(--border-radius-lg);
-  padding: 6px 12px;
-  z-index: 1002;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
+  padding: 8px 12px;
+  z-index: 2;
+  box-shadow: none;
   transition:
     width var(--duration-mid) var(--ease-panel),
     padding var(--duration-mid) var(--ease-panel);
@@ -157,7 +155,7 @@ a {
 
 .brand-header {
   display: grid;
-  grid-template-columns: minmax(54px, 0.9fr) auto minmax(0, 1fr) auto minmax(54px, 0.9fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 8px;
   text-align: center;
@@ -214,10 +212,10 @@ a {
 /* ── 6. MAP SIDEBAR (AREAS LIST) ────────────────────────────── */
 .map-sidebar {
   position: absolute;
-  top: calc(var(--panel-margin) + var(--panel-stack-offset));
+  top: var(--panel-margin);
   left: var(--panel-margin);
   width: var(--sidebar-width);
-  max-height: calc(100vh - (var(--panel-margin) * 3) - var(--panel-stack-offset));
+  max-height: calc(100vh - (var(--panel-margin) * 2));
   background: var(--color-surface-base);
   display: flex;
   flex-direction: column;
@@ -236,7 +234,8 @@ a {
   display: flex;
   align-items: center;
   background: var(--color-surface-search);
-  border-bottom: none;
+  border-top: none;
+  border-radius: 0;
   flex-shrink: 0;
 }
 
@@ -426,11 +425,11 @@ a {
 /* ── 9. INFO SIDEBAR ────────────────────────────────────────── */
 .info-sidebar {
   position: absolute;
-  top: calc(var(--panel-margin) + var(--panel-stack-offset));
+  top: var(--panel-margin);
   left: calc(var(--panel-margin) + var(--sidebar-width) + var(--panel-gap));
   width: var(--info-panel-width);
-  height: calc(100vh - (var(--panel-margin) * 3) - var(--panel-stack-offset));
-  max-height: calc(100vh - (var(--panel-margin) * 3) - var(--panel-stack-offset));
+  height: calc(100vh - (var(--panel-margin) * 2));
+  max-height: calc(100vh - (var(--panel-margin) * 2));
   min-height: 220px;
   background: var(--color-surface-base);
   border-radius: var(--border-radius-lg);
@@ -609,7 +608,8 @@ a {
   z-index: 5;
   min-height: var(--top-band-height);
   background: var(--color-surface-search);
-  border-bottom: none;
+  border-top: none;
+  border-radius: 0;
   border-top-left-radius: var(--border-radius-lg);
   border-top-right-radius: var(--border-radius-lg);
   flex-shrink: 0;
@@ -1118,11 +1118,9 @@ a {
 
   /* Brand panel — full width */
   .brand-panel {
-    width: calc(100% - 20px);
-    top: 10px;
-    left: 10px;
-    border-radius: var(--border-radius-md);
-    padding: 7px 10px;
+    width: 100%;
+    border-radius: 0;
+    padding: 8px 10px;
   }
 
   .brand-side-label { display: none; }
@@ -1406,3 +1404,8 @@ a {
 .mmcard--summary .rule-rich-text {
   color: var(--color-text-primary);
 }
+
+
+#list-banner, #info-banner { display:none !important; }
+.brand-header--compact { align-items:center; }
+.brand-panel--info .brand-title-main { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
