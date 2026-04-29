@@ -290,7 +290,16 @@ a {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: color var(--duration-fast), background var(--duration-fast);
+  /* Hidden by default; revealed when input has a value */
+  opacity: 0;
+  visibility: hidden;
+  transition: color var(--duration-fast), background var(--duration-fast),
+              opacity var(--duration-fast), visibility var(--duration-fast);
+}
+
+.search-input-wrapper.has-value .search-clear-btn {
+  opacity: 1;
+  visibility: visible;
 }
 
 .search-clear-btn:hover {
@@ -320,13 +329,16 @@ a {
   font-size: 13px;
 }
 
-/* Error state */
+/* Error state — softened to match loading-notice tone */
 .error-notice {
   padding: 24px 16px;
   text-align: center;
-  color: var(--color-error);
+  color: var(--color-text-secondary);
   font-size: 13px;
-  font-weight: 600;
+}
+
+.error-notice p {
+  margin: 0 0 12px;
 }
 
 .retry-btn {
@@ -826,10 +838,9 @@ a {
   display: block;
 }
 
-.mmcard__image-next {
+.mmcard__image-nav {
   position: absolute;
   top: 50%;
-  right: 8px;
   transform: translateY(-50%);
   width: 30px;
   height: 30px;
@@ -845,14 +856,45 @@ a {
   transition: opacity var(--duration-fast);
 }
 
-.mmcard__image-wrap:hover .mmcard__image-next,
-.mmcard__image-next:focus-visible { opacity: 1; }
+.mmcard__image-prev { left: 8px; }
+.mmcard__image-next { right: 8px; }
 
-/* Focus ring for carousel button */
-.mmcard__image-next:focus-visible {
+.mmcard__image-wrap:hover .mmcard__image-nav,
+.mmcard__image-nav:focus-visible { opacity: 1; }
+
+/* Always reveal nav buttons on touch where there is no hover */
+@media (hover: none) {
+  .mmcard__image-nav { opacity: 0.85; }
+}
+
+/* Focus ring for carousel buttons */
+.mmcard__image-nav:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
+
+/* Dot indicators */
+.mmcard__image-dots {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  padding: 4px 8px;
+  background: rgba(0, 34, 68, 0.45);
+  border-radius: var(--border-radius-pill);
+}
+
+.mmcard__image-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  transition: background var(--duration-fast);
+}
+
+.mmcard__image-dot.is-active { background: #ffffff; }
 
 
 /* ── 15. TABS ───────────────────────────────────────────────── */
@@ -1320,52 +1362,3 @@ a {
 /* component classes like .field-stack { display: grid }. This mirrors the  */
 /* rule used in every major CSS reset (normalize.css, sanitize.css, etc.)   */
 [hidden] { display: none !important; }
-
-/* ── INFO PANE DRAG HANDLE (mobile) ─────────────────────────── */
-/* Floats above the top-right of the info banner. User drags     */
-/* it to resize the sheet between peek / half / full states.     */
-.info-drag-handle {
-  display: none;
-}
-
-@media (max-width: 768px) {
-  .info-drag-handle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: absolute;
-    top: -18px;
-    right: 14px;
-    width: 44px;
-    height: 22px;
-    z-index: 1020;
-    pointer-events: auto;
-    cursor: grab;
-    touch-action: none;
-  }
-
-  .info-drag-handle:active { cursor: grabbing; }
-
-  /* The visible pill */
-  .info-drag-handle__pill {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    width: 36px;
-    height: 18px;
-    background: var(--color-brand-darkest);
-    border-radius: var(--border-radius-pill);
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    pointer-events: none;
-  }
-
-  /* Two grip lines inside the pill */
-  .info-drag-handle__line {
-    width: 16px;
-    height: 2px;
-    border-radius: 1px;
-    background: rgba(255,255,255,0.7);
-  }
-}
