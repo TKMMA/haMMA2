@@ -1034,7 +1034,7 @@ a {
 /* ── 18. MOBILE — BOTTOM SHEET LAYOUT ───────────────────────── */
 @media (max-width: 768px) {
 
-  /* Brand panel spans full width */
+  /* Brand panel — full width */
   .brand-panel {
     width: calc(100% - 20px);
     top: 10px;
@@ -1054,22 +1054,22 @@ a {
   .brand-title-main { font-size: 13px; }
   .brand-title-sub  { font-size: 9px; }
 
-  /* ── Pane stage: the sliding 200vw-wide tray ── */
+  /* ── Pane stage ─────────────────────────────────────────────── */
+  /* 200vw-wide tray. X-axis slides to show list (0) or info (-100vw).    */
+  /* Y-axis lifts or drops the sheet via state classes.                   */
   .pane-stage {
     position: fixed;
     bottom: 0;
     left: 0;
     width: 200vw;
-    height: 90dvh;
+    height: 92dvh;
     display: flex;
     gap: 0;
-    margin-bottom: calc(
-      env(safe-area-inset-bottom, 0px) + var(--browser-offset, 0px)
-    );
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--browser-offset, 0px));
 
-    /* Default: list visible (stage-x = 0), peeking (stage-y = near bottom) */
+    /* CSS custom properties driven by JS state */
     --stage-x: 0;
-    --stage-y: calc(60dvh - var(--sheet-handle-height));
+    --stage-y: calc(92dvh - var(--sheet-banner-h));
 
     transform: translate(var(--stage-x), var(--stage-y));
     transition: transform var(--duration-slow) var(--ease-panel);
@@ -1078,167 +1078,163 @@ a {
     pointer-events: none;
   }
 
-  /* Disable transition while finger is actively dragging */
-  .pane-stage.dragging { transition: none !important; }
+  /* Kill transition while dragging so the sheet tracks the finger */
+  .pane-stage.is-dragging { transition: none !important; }
 
-  /* Slide left to show info pane */
-  .pane-stage.is-info-view  { --stage-x: -100vw; }
+  /* ── Sheet state classes (set by applyMobileState) ─── */
+  /* hidden  — peek, only banner visible                  */
+  .pane-stage.is-hidden   { --stage-y: calc(92dvh - var(--sheet-banner-h)); }
+  /* open    — half, ~42dvh of sheet above banner         */
+  .pane-stage.is-open     { --stage-y: calc(50dvh - var(--sheet-banner-h)); }
+  /* full    — almost full screen, brand panel just above */
+  .pane-stage.is-full     { --stage-y: calc(8dvh); }
+  /* info view — slide left to show info panel            */
+  .pane-stage.is-info-view { --stage-x: -100vw; }
 
-  /* Peek state — only the handle strip is visible */
-  .pane-stage.is-minimized  { --stage-y: calc(60dvh - var(--sheet-handle-height)); }
-
-  /* Half state — sheet open at default height (60dvh), map visible above */
-  .pane-stage:not(.is-minimized):not(.is-expanded) { --stage-y: 0; }
-
-  /* Full state — sheet covers ~88dvh, just the brand panel above */
-  .pane-stage.is-expanded   { --stage-y: calc(-28dvh); }
-
-  /* ── Sidebars become bottom sheet panels ── */
+  /* ── Individual panels ──────────────────────────────── */
   .map-sidebar,
   .info-sidebar {
     position: relative;
     width: 100vw;
-    height: 90dvh;
-    max-height: 90dvh;
-    margin: 0;
+    flex: 0 0 100vw;
+    height: 92dvh;
+    max-height: 92dvh;
     top: auto;
     left: auto;
+    margin: 0;
     transform: none;
-    border-radius: 16px 16px 0 0;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
-    flex: 0 0 100vw;
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.18);
     pointer-events: auto;
     z-index: 1;
     transition: none;
+    overflow: hidden;
   }
 
-  /* Collapsed sidebar — only the sheet banner handle is shown */
-  .map-sidebar.collapsed .sidebar-search-wrap,
-  .map-sidebar.collapsed .island-list { display: none; }
+  /* Desktop close btn hidden on mobile */
+  .info-sidebar .close-info-btn { display: none; }
 
-  /* Hidden info sidebar — visibility:hidden keeps layout but removes from a11y tree */
-  .info-sidebar.mobile-hidden {
+  /* Collapsed list — search and list hidden, only banner visible */
+  .map-sidebar.is-collapsed .sidebar-search-wrap,
+  .map-sidebar.is-collapsed .island-list { display: none; }
+
+  /* Info sidebar invisible when not active */
+  .info-sidebar.is-offscreen {
     visibility: hidden;
     pointer-events: none;
   }
 
-  /* Hide desktop close button on mobile — the banner's ✕ replaces it */
-  .info-sidebar .close-info-btn { display: none; }
-
-  /* Hide info content when minimized */
-  .info-sidebar[data-mobile-state="minimized"] .info-content,
-  .info-sidebar[data-mobile-state="minimized"] .close-info-btn { display: none; }
-
-  /* Safe-area padding on scrollable areas */
-  .sidebar-search-wrap,
+  /* Safe-area scroll padding */
   .mmpopup__scroll {
-    padding-bottom: calc(
-      10px + env(safe-area-inset-bottom, 0px) + var(--browser-offset, 0px)
-    );
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
 
-  /* ── Sheet banners: shown on mobile ── */
+  /* ── Sheet banners ───────────────────────────────────── */
+  :root { --sheet-banner-h: 48px; }
+
   .sheet-banner {
-    display: grid;
-    grid-template-columns: 80px 1fr 80px;
-    align-items: center;
+    display: flex;
+    align-items: stretch;
     width: 100%;
-    height: var(--sheet-handle-height);
-    min-height: var(--sheet-handle-height);
-    max-height: var(--sheet-handle-height);
-    padding: 0 8px;
-    pointer-events: auto;
-    box-sizing: border-box;
-    background: var(--color-brand-darkest);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    height: var(--sheet-banner-h);
+    min-height: var(--sheet-banner-h);
+    max-height: var(--sheet-banner-h);
     flex-shrink: 0;
+    background: var(--color-brand-darkest);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    pointer-events: auto;
+    position: relative;
+    border-radius: 14px 14px 0 0;
   }
 
-  .map-sidebar .sheet-banner,
-  .info-sidebar .sheet-banner { width: 100vw; }
-
-  /* Sheet handle: repurposed as an up/down chevron on mobile */
-  .sheet-handle {
-    border: none;
-    background: transparent;
-    width: 48px;
-    height: var(--sheet-handle-height);
-    padding: 0;
-    justify-self: center;
-    position: relative;
+  /* Drag zone — fills the centre of the banner, is the drag target */
+  .sheet-banner__drag-zone {
+    flex: 1;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 4px;
+    cursor: grab;
+    touch-action: none;
+    padding: 6px 0;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
-  .sheet-handle::before {
-    content: "";
-    width: 0;
-    height: 0;
-    border-left: 7px solid transparent;
-    border-right: 7px solid transparent;
-    border-top: 9px solid rgba(255, 255, 255, 0.85);
-    transition: transform var(--duration-mid) ease;
+  .sheet-banner__drag-zone:active { cursor: grabbing; }
+
+  /* Grip pill — two lines */
+  .sheet-banner__grip {
+    width: 32px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.35);
+    position: relative;
   }
 
-  .pane-stage:not(.is-minimized) .map-sidebar .sheet-handle::before {
-    transform: rotate(180deg);
+  .sheet-banner__grip::after {
+    content: '';
+    position: absolute;
+    top: 5px;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.2);
   }
 
-  .sheet-banner-title {
-    text-align: center;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    color: rgba(255, 255, 255, 0.9);
-    text-transform: uppercase;
-  }
-
-  .sheet-banner-action {
-    border: none;
-    background: transparent;
-    color: rgba(255, 255, 255, 0.85);
+  .sheet-banner__title {
     font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.04em;
-    padding: 4px 6px;
-    border-radius: var(--border-radius-sm);
-    justify-self: start;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.7);
+    line-height: 1;
   }
 
-  .sheet-banner-action:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--color-text-on-brand);
-  }
-
-  .sheet-banner-right-action {
+  /* Back button (info panel only) */
+  .sheet-banner__back {
     display: flex;
-    justify-self: end;
+    align-items: center;
+    padding: 0 12px;
     border: none;
     background: transparent;
-    color: rgba(255, 255, 255, 0.75);
-    font-size: 18px;
-    width: 36px;
-    height: 36px;
+    color: rgba(255,255,255,0.85);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .sheet-banner__back:hover { color: #fff; }
+
+  /* Close button (info panel only) */
+  .sheet-banner__close {
+    display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
+    width: 44px;
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,0.65);
+    font-size: 16px;
+    flex-shrink: 0;
+    cursor: pointer;
   }
 
-  .sheet-banner-right-action:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--color-text-on-brand);
-  }
+  .sheet-banner__close:hover { color: #fff; }
 
-  /* Focus rings on dark banner */
-  .sheet-handle:focus-visible,
-  .sheet-banner-action:focus-visible,
-  .sheet-banner-right-action:focus-visible {
+  /* Focus rings on dark banners */
+  .sheet-banner__back:focus-visible,
+  .sheet-banner__close:focus-visible,
+  .sheet-banner__drag-zone:focus-visible {
     outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
+    outline-offset: -2px;
   }
 
-  /* Info hint repositioned for mobile */
+  /* Info hint — repositioned for mobile */
   .info-empty-hint {
     top: 78px;
     left: 10px;
@@ -1246,13 +1242,13 @@ a {
     z-index: 998;
   }
 
-  /* Leaflet zoom control — above sheet handle */
+  /* Leaflet zoom — above banner */
   .leaflet-bottom.leaflet-right {
-    bottom: calc(var(--sheet-handle-height) + 12px);
+    bottom: calc(var(--sheet-banner-h) + 12px);
     right: 10px;
   }
-}
 
+}
 
 /* ── 19. UTILITY CLASSES ─────────────────────────────────────── */
 
