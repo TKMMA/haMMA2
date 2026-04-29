@@ -540,8 +540,11 @@ a {
 .hint-dismiss:hover { color: var(--color-text-primary); }
 
 
+/* Info mobile header — hidden on desktop, shown on mobile */
+.info-mobile-header { display: none; }
+
 /* ── 11. MOBILE SHEET BANNER ────────────────────────────────── */
-/* Hidden on desktop, shown on mobile via media query */
+/* .sheet-banner is used by old code paths; hide it globally */
 .sheet-banner { display: none; }
 
 .sheet-handle {
@@ -764,22 +767,57 @@ a {
 }
 
 .mmcard--summary {
-  border: 1px solid var(--color-border-brand);
-  background: var(--color-surface-search);
+  border: 2px solid var(--color-brand-mid);
+  background: var(--color-brand-lightest);
   color: var(--color-text-primary);
   margin-bottom: 14px;
+  box-shadow: 0 2px 12px rgba(0, 90, 135, 0.12);
 }
 
-.mmcard--summary .mm-bullet-text {
+.mmcard--summary .mmcard__body {
+  padding: 14px;
+}
+
+/* Summary card header label */
+.summary-card-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-brand-main);
+  margin-bottom: 10px;
+}
+
+.summary-card-label::before {
+  content: '';
+  display: block;
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--color-brand-main);
+  flex-shrink: 0;
+}
+
+/* Area names list inside summary card */
+.summary-area-list {
+  margin: 0 0 12px;
+  padding: 0 0 0 16px;
+  list-style: disc;
+  border-bottom: 1px solid var(--color-border-brand);
+  padding-bottom: 10px;
+}
+
+.summary-area-name {
+  font-size: 12px;
+  font-weight: 600;
   color: var(--color-text-primary);
-  font-weight: 500;
+  line-height: 1.5;
 }
 
 .mmcard__body { padding: 14px; }
-
-.mmcard__body--summary {
-  padding-top: 0;
-}
 
 .mmcard__title {
   font-size: 16px;
@@ -1065,27 +1103,7 @@ a {
 /* ── 18. MOBILE — BOTTOM SHEET LAYOUT ───────────────────────── */
 @media (max-width: 768px) {
 
-  /* Brand panel — full width */
-  .brand-panel {
-    width: 100%;
-    border-radius: 0;
-    padding: 8px 10px;
-  }
-
-  .brand-side-label { display: none; }
-
-  .brand-header {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    column-gap: 8px;
-  }
-
-  .brand-logo       { width: 28px; height: 28px; }
-  .brand-title-main { font-size: 13px; }
-  .brand-title-sub  { font-size: 9px; }
-
   /* ── Pane stage ─────────────────────────────────────────────── */
-  /* 200vw-wide tray. X-axis slides to show list (0) or info (-100vw).    */
-  /* Y-axis lifts or drops the sheet via state classes.                   */
   .pane-stage {
     position: fixed;
     bottom: 0;
@@ -1095,11 +1113,8 @@ a {
     display: flex;
     gap: 0;
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--browser-offset, 0px));
-
-    /* CSS custom properties driven by JS state */
     --stage-x: 0;
     --stage-y: calc(92dvh - var(--sheet-banner-h));
-
     transform: translate(var(--stage-x), var(--stage-y));
     transition: transform var(--duration-slow) var(--ease-panel);
     will-change: transform;
@@ -1107,17 +1122,14 @@ a {
     pointer-events: none;
   }
 
-  /* Kill transition while dragging so the sheet tracks the finger */
   .pane-stage.is-dragging { transition: none !important; }
 
-  /* ── Sheet state classes (set by applyMobileState) ─── */
-  /* hidden  — peek, only banner visible                  */
+  /* sheet-banner-h is now the height of the brand panel / info header */
+  :root { --sheet-banner-h: 58px; --sheet-tab-h: 22px; }
+
   .pane-stage.is-hidden   { --stage-y: calc(92dvh - var(--sheet-banner-h)); }
-  /* open    — half, ~42dvh of sheet above banner         */
   .pane-stage.is-open     { --stage-y: calc(50dvh - var(--sheet-banner-h)); }
-  /* full    — almost full screen, brand panel just above */
   .pane-stage.is-full     { --stage-y: calc(8dvh); }
-  /* info view — slide left to show info panel            */
   .pane-stage.is-info-view { --stage-x: -100vw; }
 
   /* ── Individual panels ──────────────────────────────── */
@@ -1132,31 +1144,27 @@ a {
     left: auto;
     margin: 0;
     transform: none;
-    /* No border-radius — the tab ::before handles the visual top rounding */
     border-radius: 0;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.18);
     pointer-events: auto;
     z-index: 1;
     transition: none;
-    /* Allow tab to protrude above sheet top edge */
     overflow: visible;
   }
 
   /* Clip the scrollable content area, not the whole panel */
   .map-sidebar .sidebar-search-wrap,
-  .info-sidebar .info-content {
-    overflow: hidden;
-  }
+  .info-sidebar .info-content { overflow: hidden; }
 
   .map-sidebar .island-list {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Desktop info-panel-header hidden on mobile — sheet banner takes over */
+  /* Desktop info-panel-header hidden on mobile */
   .info-sidebar .info-panel-header { display: none; }
 
-  /* Collapsed list — search and list hidden, only banner visible */
+  /* Collapsed list — search and list hidden, only brand panel visible */
   .map-sidebar.is-collapsed .sidebar-search-wrap,
   .map-sidebar.is-collapsed .island-list { display: none; }
 
@@ -1171,146 +1179,186 @@ a {
     padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
 
-  /* ── Sheet banners ───────────────────────────────────── */
-  :root { --sheet-banner-h: 48px; --sheet-tab-h: 22px; }
-
-  .sheet-banner {
-    display: flex;
-    align-items: stretch;
+  /* ── Brand panel as drag surface (list side) ─────────── */
+  /* On mobile the brand panel is the sheet handle.         */
+  /* It must be exactly --sheet-banner-h tall.              */
+  .brand-panel {
     width: 100%;
-    height: var(--sheet-banner-h);
-    min-height: var(--sheet-banner-h);
-    max-height: var(--sheet-banner-h);
-    flex-shrink: 0;
-    background: var(--color-brand-darkest);
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    pointer-events: auto;
-    position: relative;
-    /* No top border-radius — the tab above handles the visual rounding */
     border-radius: 0;
+    padding: 0;
+    height: var(--sheet-banner-h);
+    display: flex;
+    flex-direction: column;
+    position: relative;
     overflow: visible;
+    touch-action: none;
+    cursor: grab;
   }
 
-  /* Drag zone — fills the centre of the banner, is the drag target.   */
-  /* The ::before pseudo-element is the protruding tab above the sheet. */
-  .sheet-banner__drag-zone {
-    flex: 1;
+  .brand-panel:active { cursor: grabbing; }
+
+  /* Drag grip lives at the very top of the brand panel */
+  .brand-panel .sheet-banner__drag-zone {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    gap: 6px;
-    cursor: grab;
+    padding-top: 0;
+    pointer-events: none; /* brand-panel itself is the touch target */
+    z-index: 2;
     touch-action: none;
-    padding: 0;
-    user-select: none;
-    -webkit-user-select: none;
-    position: relative;
   }
 
-  .sheet-banner__drag-zone:active { cursor: grabbing; }
-
-  /* The protruding tab — sits above the sheet top edge */
-  .sheet-banner__drag-zone::before {
+  /* Protruding tab above the sheet */
+  .brand-panel .sheet-banner__drag-zone::before {
     content: '';
     position: absolute;
     top: calc(-1 * var(--sheet-tab-h));
     left: 50%;
     transform: translateX(-50%);
-    width: 56px;
+    width: 64px;
     height: var(--sheet-tab-h);
     background: var(--color-brand-darkest);
     border-radius: 10px 10px 0 0;
     box-shadow: -2px -3px 6px rgba(0,0,0,0.18);
-    pointer-events: inherit;
   }
 
-  /* Grip lines sit inside the drag zone, above the tab visually */
+  .brand-panel .sheet-banner__grip {
+    position: relative;
+    z-index: 1;
+    margin-top: 8px;
+    flex-shrink: 0;
+  }
+
+  /* Logos row sits below the grip inside the brand panel */
+  .brand-panel .brand-header {
+    position: relative;
+    z-index: 1;
+    padding: 2px 12px 6px;
+    pointer-events: none;
+  }
+
+  .brand-logo { width: 26px; height: 26px; }
+  .brand-title-main { font-size: 12px; }
+
+  /* ── Info mobile header (gradient, same height as brand panel) ── */
+  .info-mobile-header {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: var(--sheet-banner-h);
+    flex-shrink: 0;
+    background: linear-gradient(135deg, var(--color-brand-darkest), var(--color-brand-mid));
+    position: relative;
+    overflow: visible;
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .info-mobile-header:active { cursor: grabbing; }
+
+  /* Drag zone covers the full header */
+  .info-mobile-header .sheet-banner__drag-zone {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    pointer-events: none;
+    z-index: 2;
+    touch-action: none;
+  }
+
+  /* Protruding tab */
+  .info-mobile-header .sheet-banner__drag-zone::before {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--sheet-tab-h));
+    left: 50%;
+    transform: translateX(-50%);
+    width: 64px;
+    height: var(--sheet-tab-h);
+    background: var(--color-brand-darkest);
+    border-radius: 10px 10px 0 0;
+    box-shadow: -2px -3px 6px rgba(0,0,0,0.18);
+  }
+
+  .info-mobile-header .sheet-banner__grip {
+    position: relative;
+    z-index: 1;
+    margin-top: 8px;
+    flex-shrink: 0;
+  }
+
+  /* Back / title / close row */
+  .info-mobile-header__row {
+    display: flex;
+    align-items: center;
+    padding: 2px 4px 6px;
+    gap: 4px;
+    flex: 1;
+    position: relative;
+    z-index: 1;
+  }
+
+  .info-mobile-header__back,
+  .info-mobile-header__close {
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,0.85);
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    padding: 0 10px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+  }
+
+  .info-mobile-header__close { font-size: 15px; }
+
+  .info-mobile-header__back:hover,
+  .info-mobile-header__close:hover { color: #fff; }
+
+  .info-mobile-header__title {
+    flex: 1;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.9);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Grip lines */
   .sheet-banner__grip {
     width: 28px;
     height: 3px;
     border-radius: 2px;
-    background: rgba(255,255,255,0.55);
-    position: relative;
-    z-index: 1;
+    background: rgba(255,255,255,0.5);
     flex-shrink: 0;
-    margin-top: -13px;
   }
 
   .sheet-banner__grip::after {
     content: '';
-    position: absolute;
-    top: 6px;
-    left: 0;
+    display: block;
+    margin-top: 5px;
     width: 100%;
     height: 3px;
     border-radius: 2px;
-    background: rgba(255,255,255,0.3);
-  }
-
-  .sheet-banner__title {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: rgba(255,255,255,0.72);
-    line-height: 1;
-    z-index: 1;
-    position: absolute;
-    top: calc(-1 * var(--sheet-tab-h) + 5px);
-    left: 50%;
-    transform: translateX(-50%);
-    white-space: nowrap;
-    pointer-events: none;
-  }
-
-  /* Back button (info panel only) */
-  .sheet-banner__back {
-    display: flex;
-    align-items: center;
-    padding: 0 12px;
-    border: none;
-    background: transparent;
-    color: rgba(255,255,255,0.85);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    flex-shrink: 0;
-    cursor: pointer;
-  }
-
-  .sheet-banner__back:hover { color: #fff; }
-
-  /* Close button (info panel only) */
-  .sheet-banner__close {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    border: none;
-    background: transparent;
-    color: rgba(255,255,255,0.65);
-    font-size: 16px;
-    flex-shrink: 0;
-    cursor: pointer;
-  }
-
-  .sheet-banner__close:hover { color: #fff; }
-
-  /* Focus rings on dark banners */
-  .sheet-banner__back:focus-visible,
-  .sheet-banner__close:focus-visible,
-  .sheet-banner__drag-zone:focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: -2px;
-  }
-
-  /* Info hint — repositioned for mobile */
-  .info-empty-hint {
-    top: 78px;
-    left: 10px;
-    max-width: calc(100% - 20px);
-    z-index: 998;
+    background: rgba(255,255,255,0.28);
   }
 
   .leaflet-control-zoom { display: none !important; }
@@ -1354,20 +1402,8 @@ a {
 [hidden] { display: none !important; }
 
 
-/* Mobile banner overrides — list and info banners use !important to
-   win over the base display:none on .sheet-banner                    */
+/* Mobile banner overrides */
 @media (max-width: 768px) {
   .info-sidebar > .brand-panel--info { display: none; }
-  #list-banner { display: flex !important; }
-  #info-banner { display: flex !important; }
-  #info-banner .sheet-banner__drag-zone { justify-content: center; gap: 2px; }
-  #info-banner .sheet-banner__title {
-    position: static;
-    transform: none;
-    white-space: normal;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    line-height: 1;
-  }
+  /* info-mobile-header shown by default on mobile via display:flex in media query above */
 }
