@@ -1136,9 +1136,7 @@
              ${buildAreaNamesPlainList(features)}
            </ul>
          </button>`
-      : `<div class="mmpopup__header-inner">
-           <span class="mmpopup__header-title">${headerTitle}</span>
-         </div>`;
+      : '';
 
     // Summary panel is now just the card content (no outer accordion wrapper)
     // — the trigger lives in the header above
@@ -1146,7 +1144,7 @@
 
     infoContentEl.innerHTML = `
       <div class="mmpopup">
-        <div class="mmpopup__header">${headerHtml}</div>
+        ${headerHtml ? `<div class="mmpopup__header">${headerHtml}</div>` : ''}
         <div class="mmpopup__scroll">
           ${summaryPanelHtml}
           ${dividerHtml}
