@@ -258,102 +258,11 @@
 
   function syncMobileBrowserInset() {
     if (!paneStageEl) return;
-    if (!isMobileView()) {
-      paneStageEl.style.setProperty('--browser-offset', '0px');
-      return;
-    }
     const vv = window.visualViewport;
-    if (!vv) {
-      paneStageEl.style.setProperty('--browser-offset', '0px');
-      return;
-    }
-    const inset = Math.max(0, Math.round(window.innerHeight - (vv.height + vv.offsetTop)));
+    const inset = vv
+      ? Math.max(0, Math.round(window.innerHeight - (vv.height + vv.offsetTop)))
+      : 0;
     paneStageEl.style.setProperty('--browser-offset', `${inset}px`);
-  }
-
-  // Switch the pane stage between list and info views (mobile slide)
-  function setMobilePaneStage(stage = 'list') {
-    if (!isMobileView() || !paneStageEl) return;
-    paneStageEl.classList.toggle('is-info-view', stage === 'info');
-  }
-
-  function setMobileInfoPaneVisibility(isVisible) {
-    if (!infoSidebarEl || !isMobileView()) return;
-    infoSidebarEl.classList.toggle('mobile-hidden', !isVisible);
-  }
-
-  function setMobileVerticalState(isMinimized) {
-    if (!isMobileView() || !paneStageEl) return;
-    paneStageEl.classList.toggle('is-minimized', Boolean(isMinimized));
-  }
-
-  function toggleMobileStageMinimized() {
-    if (!isMobileView() || !paneStageEl) return false;
-    paneStageEl.classList.toggle('is-minimized');
-    return paneStageEl.classList.contains('is-minimized');
-  }
-
-  // Return the pane stage to the default "peek" state
-  function setMobileHomeState(options = {}) {
-    if (!isMobileView() || !paneStageEl) return;
-
-    setMobilePaneStage('list');
-    setMapSidebarMobileState('minimized');
-    setMobileVerticalState(true);
-
-    const hideInfo = () => {
-      setInfoSidebarState('hidden');
-      setMobileInfoPaneVisibility(false);
-    };
-
-    if (options.hideInfoAfterTransition) {
-      if (mobileInfoHideTimer) clearTimeout(mobileInfoHideTimer);
-      mobileInfoHideTimer = setTimeout(() => {
-        hideInfo();
-        mobileInfoHideTimer = null;
-      }, 400);
-    } else {
-      hideInfo();
-    }
-  }
-
-  function setInfoSidebarState(state = 'hidden') {
-    if (!infoSidebarEl) return;
-    const nextState = isMobileView() && state === 'expanded' ? 'open' : state;
-    infoSidebarEl.dataset.mobileState = nextState;
-    infoSidebarEl.classList.toggle('active',        state !== 'hidden');
-    infoSidebarEl.classList.toggle('is-active-pane', nextState === 'open');
-
-    if (nextState === 'open') {
-      setMobileInfoPaneVisibility(true);
-      setMobileVerticalState(false);
-    } else if (nextState === 'hidden') {
-      setMobileInfoPaneVisibility(false);
-    }
-
-    if (isMobileView()) updateInfoBannerTitle();
-  }
-
-  function setMapSidebarMobileState(state = 'minimized') {
-    if (!mapSidebarEl || !isMobileView()) return;
-    mapSidebarEl.dataset.mobileState = state;
-    mapSidebarEl.classList.toggle('collapsed',      state !== 'open');
-    mapSidebarEl.classList.toggle('is-active-pane', state === 'open');
-    setMobileVerticalState(state !== 'open');
-    updateMapSidebarBanner();
-  }
-
-  function setMapSidebarDesktopState() {
-    if (!mapSidebarEl || isMobileView()) return;
-    mapSidebarEl.classList.remove('collapsed');
-  }
-
-  // FIX: was unconditional — removed 'collapsed' from the sidebar on mobile,
-  // immediately undoing the state set by setMapSidebarMobileState() above it.
-  function syncSidebarToggleUI() {
-    if (isMobileView()) return;
-    mapInterfaceEl?.classList.remove('sidebar-collapsed');
-    mapSidebarEl?.classList.remove('collapsed');
   }
 
   function syncLeafletControlPosition() {
@@ -364,42 +273,103 @@
     zoomControl.addTo(map);
   }
 
-  // Single entry point for all responsive sidebar state changes.
-  // FIX: original code called setMobileHomeState() twice more after this
-  // (once inline + once in window.onload), causing triple-init on mobile
-  // and racing state. This is now the only initialization path.
+  function setMapSidebarDesktopState() {
+    if (!mapSidebarEl || isMobileView()) return;
+    mapSidebarEl.classList.remove('is-collapsed');
+  }
+
+  function syncSidebarToggleUI() {
+    if (isMobileView()) return;
+    mapInterfaceEl?.classList.remove('sidebar-collapsed');
+    mapSidebarEl?.classList.remove('is-collapsed');
+  }
+
+
+  // ── 8. MOBILE STATE MACHINE ──────────────────────────────────
+  //
+  // Single source of truth: mobileState
+  //   'hidden'    — sheet peeks (only banner visible), list panel showing
+  //   'list-open' — list panel open at half height
+  //   'list-full' — list panel at full height
+  //   'info-half' — info panel open at half height
+  //   'info-full' — info panel at full height
+  //
+  // applyMobileState() is the ONLY place that touches mobile CSS classes.
+  // Everything else just calls applyMobileState(nextState).
+
+  let mobileState = 'hidden';
+
+  // Snap positions as a fraction of screen height (stage Y offset)
+  // These mirror the CSS custom property values in style.css
+  function snapY(state) {
+    const H = window.innerHeight;
+    const bh = 48; // --sheet-banner-h
+    if (state === 'hidden')    return H * 0.92 - bh;
+    if (state === 'list-open') return H * 0.50 - bh;
+    if (state === 'list-full') return H * 0.08;
+    if (state === 'info-half') return H * 0.50 - bh;
+    if (state === 'info-full') return H * 0.08;
+    return H * 0.92 - bh;
+  }
+
+  function applyMobileState(nextState, opts = {}) {
+    if (!isMobileView()) return;
+    mobileState = nextState;
+
+    const stage   = paneStageEl;
+    const list    = mapSidebarEl;
+    const info    = infoSidebarEl;
+    if (!stage || !list || !info) return;
+
+    // ── X position ─────────────────────────────────────────────
+    const isInfoView = nextState === 'info-half' || nextState === 'info-full';
+    stage.classList.toggle('is-info-view', isInfoView);
+
+    // ── Y position ─────────────────────────────────────────────
+    stage.classList.remove('is-hidden', 'is-open', 'is-full');
+    if (nextState === 'hidden') {
+      stage.classList.add('is-hidden');
+    } else if (nextState === 'list-open' || nextState === 'info-half') {
+      stage.classList.add('is-open');
+    } else {
+      stage.classList.add('is-full');
+    }
+
+    // ── List panel ─────────────────────────────────────────────
+    list.classList.toggle('is-collapsed', nextState === 'hidden');
+
+    // ── Info panel visibility ───────────────────────────────────
+    // Keep info in DOM but visually hidden when showing list
+    // so the 200vw layout doesn't collapse
+    const infoVisible = isInfoView;
+    info.classList.toggle('is-offscreen', !infoVisible);
+    info.classList.toggle('active',       infoVisible);
+
+    // ── After transition, centre the selected polygon ───────────
+    if (infoVisible && activeLastLatlng) {
+      if (opts.skipRecentre) return;
+      setTimeout(() => flyToMobileVisibleCenter(activeLastLatlng), SHEET_TRANSITION_MS);
+    }
+  }
+
   function syncResponsiveSidebarState() {
     if (!mapSidebarEl) return;
 
     if (isMobileView()) {
-      const listState = mapSidebarEl.dataset.mobileState === 'open' ? 'open' : 'minimized';
-      setMapSidebarMobileState(listState);
-
-      if (infoSidebarEl.classList.contains('active')) {
-        const infoState = infoSidebarEl.dataset.mobileState === 'open' ? 'open' : 'minimized';
-        setInfoSidebarState(infoState);
-        setMobilePaneStage('info');
-      } else {
-        setInfoSidebarState('hidden');
-        setMobileInfoPaneVisibility(false);
-        setMobilePaneStage('list');
-        setMobileVerticalState(listState !== 'open');
-      }
-
-      updateMapSidebarBanner();
-      updateInfoBannerTitle();
+      // Re-apply current mobileState to restore correct classes
+      // (called on resize / orientation change)
+      applyMobileState(mobileState, { skipRecentre: true });
+      syncMobileBrowserInset();
     } else {
-      paneStageEl?.classList.remove('is-info-view', 'is-minimized');
-      mapSidebarEl.dataset.mobileState  = 'desktop';
-      infoSidebarEl.dataset.mobileState = infoSidebarEl.classList.contains('active')
-        ? 'expanded'
-        : 'hidden';
+      // Desktop — clear all mobile classes
+      paneStageEl?.classList.remove('is-hidden', 'is-open', 'is-full', 'is-info-view', 'is-dragging');
+      mapSidebarEl.classList.remove('is-collapsed');
+      infoSidebarEl.classList.remove('is-offscreen');
       setMapSidebarDesktopState();
     }
 
     syncSidebarToggleUI();
     syncLeafletControlPosition();
-    syncMobileBrowserInset();
   }
 
   function setInitialMapExtent() {
@@ -421,261 +391,97 @@
   }
 
 
-  // ── 8. SHEET BANNERS ─────────────────────────────────────────
-  // Lazily creates (or updates) the mobile drag-handle banner
-  // at the top of each sidebar panel.
-  function ensureSidebarBanner(sidebarEl, options = {}) {
-    if (!sidebarEl) return null;
+  // ── DRAG BEHAVIOUR ───────────────────────────────────────────
+  // The drag zone in each banner directly controls the pane-stage Y
+  // transform in real time. On release it snaps to the nearest valid
+  // state using velocity projection.
 
-    let banner = sidebarEl.querySelector('.sheet-banner');
-    if (!banner) {
-      banner            = document.createElement('div');
-      banner.className  = 'sheet-banner';
+  // Snap states available from each view
+  const LIST_SNAPS = ['hidden', 'list-open', 'list-full'];
+  const INFO_SNAPS = ['hidden', 'info-half', 'info-full'];
 
-      const handle      = document.createElement('button');
-      handle.type       = 'button';
-      handle.className  = 'sheet-handle';
+  let _drag = null; // active drag session
 
-      const title       = document.createElement('span');
-      title.className   = 'sheet-banner-title';
-
-      const action      = document.createElement('button');
-      action.type       = 'button';
-      action.className  = 'sheet-banner-action';
-
-      const rightAction = document.createElement('button');
-      rightAction.type      = 'button';
-      rightAction.className = 'sheet-banner-right-action';
-
-      banner.append(action, title, rightAction, handle);
-      sidebarEl.prepend(banner);
-    }
-
-    const handleEl      = banner.querySelector('.sheet-handle');
-    const titleEl       = banner.querySelector('.sheet-banner-title');
-    const actionEl      = banner.querySelector('.sheet-banner-action');
-    const rightActionEl = banner.querySelector('.sheet-banner-right-action');
-
-    titleEl.textContent = options.title || '';
-
-    if (options.handleLabel) handleEl.setAttribute('aria-label', options.handleLabel);
-    handleEl.classList.toggle('is-expanded', Boolean(options.expanded));
-    handleEl.style.display = options.showHandle === false ? 'none' : 'inline-flex';
-    handleEl.onclick       = (e) => e.stopPropagation();
-
-    if (options.actionText) {
-      actionEl.textContent   = options.actionText;
-      actionEl.style.display = 'inline-flex';
-      actionEl.onclick = (e) => { e.stopPropagation(); options.onAction?.(); };
-      if (options.actionLabel) actionEl.setAttribute('aria-label', options.actionLabel);
-    } else {
-      actionEl.style.display = 'none';
-      actionEl.onclick = null;
-    }
-
-    if (options.rightActionText) {
-      rightActionEl.textContent   = options.rightActionText;
-      rightActionEl.style.display = 'inline-flex';
-      rightActionEl.onclick = (e) => { e.stopPropagation(); options.onRightAction?.(); };
-      if (options.rightActionLabel) rightActionEl.setAttribute('aria-label', options.rightActionLabel);
-    } else {
-      rightActionEl.style.display = 'none';
-      rightActionEl.onclick = null;
-    }
-
-    actionEl.style.gridColumn      = options.actionGridColumn      || '1';
-    titleEl.style.gridColumn       = options.titleGridColumn       || '2';
-    rightActionEl.style.gridColumn = options.rightActionGridColumn || '3';
-    handleEl.style.gridColumn      = options.handleGridColumn      || '3';
-
-    banner.onclick = options.onToggle ? () => options.onToggle() : null;
-
-    return banner;
-  }
-
-  function updateMapSidebarBanner() {
-    if (!isMobileView()) return;
-    const isOpen = mapSidebarEl?.dataset.mobileState === 'open';
-
-    ensureSidebarBanner(mapSidebarEl, {
-      title:       'Areas List',
-      handleLabel: isOpen ? 'Collapse areas list' : 'Expand areas list',
-      expanded:    isOpen,
-      onToggle: () => {
-        const minimized = toggleMobileStageMinimized();
-        mapSidebarEl.dataset.mobileState = minimized ? 'minimized' : 'open';
-        mapSidebarEl.classList.toggle('collapsed', minimized);
-        updateMapSidebarBanner();
-      },
-      actionGridColumn: '1',
-      titleGridColumn:  '2',
-      handleGridColumn: '3',
-    });
-  }
-
-
-  // ── INFO PANE DRAG HANDLE ─────────────────────────────────────
-  // Creates a small grip pill above the top-right of the info banner.
-  // Dragging it resizes the sheet in real time; releasing snaps to the
-  // nearest state (peek / half / full) using velocity projection.
-
-  function ensureInfoDragHandle() {
-    if (!isMobileView() || !infoSidebarEl) return;
-    if (document.getElementById('info-drag-handle')) return;
-
-    const handle = document.createElement('div');
-    handle.id        = 'info-drag-handle';
-    handle.className = 'info-drag-handle';
-    handle.setAttribute('aria-hidden', 'true');
-    handle.innerHTML = `
-      <div class="info-drag-handle__pill">
-        <div class="info-drag-handle__line"></div>
-        <div class="info-drag-handle__line"></div>
-      </div>`;
-
-    handle.addEventListener('touchstart',  onDragStart, { passive: false });
-    handle.addEventListener('touchmove',   onDragMove,  { passive: false });
-    handle.addEventListener('touchend',    onDragEnd,   { passive: false });
-    handle.addEventListener('touchcancel', onDragEnd,   { passive: false });
-
-    infoSidebarEl.appendChild(handle);
-  }
-
-  function onDragStart(e) {
+  function onBannerDragStart(e, panel) {
     if (!isMobileView() || !paneStageEl) return;
     e.preventDefault();
 
-    const touch = e.touches[0];
+    const touch = (e.touches || [e])[0];
 
-    // Read current computed translateY from the CSS transform matrix
+    // Read current Y from computed matrix (may be mid-transition)
+    // Cancel transition first so we get the settled value
+    paneStageEl.classList.add('is-dragging');
     const matrix   = new DOMMatrix(getComputedStyle(paneStageEl).transform);
-    const currentY = matrix.f; // px
+    const currentY = matrix.f;
+    const currentX = matrix.e;
 
-    // X offset: -innerWidth when info-view is active, else 0
-    const stageX = paneStageEl.classList.contains('is-info-view')
-      ? -window.innerWidth
-      : 0;
-
-    dragState = {
-      startTouchY: touch.clientY,
-      baseY:       currentY,
-      stageX,
-      lastY:       currentY,
-      lastTime:    Date.now(),
-      velocity:    0,
+    _drag = {
+      panel,
+      startY:   touch.clientY,
+      baseY:    currentY,
+      currentX,
+      lastY:    currentY,
+      lastTime: Date.now(),
+      velocity: 0,
     };
-
-    paneStageEl.classList.add('dragging');
   }
 
-  function onDragMove(e) {
-    if (!dragState) return;
+  function onBannerDragMove(e) {
+    if (!_drag) return;
     e.preventDefault();
 
-    const touch  = e.touches[0];
-    const deltaY = touch.clientY - dragState.startTouchY;
-    const rawY   = dragState.baseY + deltaY;
+    const touch    = (e.touches || [e])[0];
+    const deltaY   = touch.clientY - _drag.startY;
+    const rawY     = _drag.baseY + deltaY;
 
-    // Clamp between full and peek
-    const H      = window.innerHeight;
-    const minY   = -H * 0.28;          // full state
-    const maxY   = H * 0.60 - 48;      // peek state
+    // Clamp between full and hidden snap positions
+    const minY = snapY('list-full');  // highest (most visible)
+    const maxY = snapY('hidden');     // lowest (peeking)
     const clampedY = Math.max(minY, Math.min(maxY, rawY));
 
-    // Track velocity (px/ms)
+    // Track velocity
     const now = Date.now();
-    const dt  = now - dragState.lastTime;
-    if (dt > 0) {
-      dragState.velocity = (clampedY - dragState.lastY) / dt;
-    }
-    dragState.lastY   = clampedY;
-    dragState.lastTime = now;
+    const dt  = now - _drag.lastTime || 1;
+    _drag.velocity = (clampedY - _drag.lastY) / dt;
+    _drag.lastY    = clampedY;
+    _drag.lastTime = now;
 
-    // Apply transform directly — bypasses CSS classes for real-time feel
-    paneStageEl.style.transform = `translate(${dragState.stageX}px, ${clampedY}px)`;
+    paneStageEl.style.transform = `translate(${_drag.currentX}px, ${clampedY}px)`;
   }
 
-  function onDragEnd(e) {
-    if (!dragState) return;
-    e.preventDefault();
+  function onBannerDragEnd(e) {
+    if (!_drag) return;
+    if (e) e.preventDefault();
 
-    const H          = window.innerHeight;
-    const currentY   = dragState.lastY;
-    const velocity   = dragState.velocity; // px/ms
+    const currentY   = _drag.lastY;
+    const velocity   = _drag.velocity;
+    const panel      = _drag.panel;
 
-    // Project 150ms forward to weight snap toward momentum direction
-    const projectedY = currentY + velocity * 150;
-
-    // Snap point positions in px
-    const snapPeek = H * 0.60 - 48;
-    const snapHalf = 0;
-    const snapFull = -H * 0.28;
-
-    const distances = [
-      { state: 'peek', dist: Math.abs(projectedY - snapPeek) },
-      { state: 'half', dist: Math.abs(projectedY - snapHalf) },
-      { state: 'full', dist: Math.abs(projectedY - snapFull) },
-    ].sort((a, b) => a.dist - b.dist);
-
-    const target = distances[0].state;
-
-    // Re-enable CSS transition, clear inline override
-    paneStageEl.classList.remove('dragging');
+    // Re-enable CSS transitions, clear inline transform override
+    paneStageEl.classList.remove('is-dragging');
     paneStageEl.style.transform = '';
 
-    // Apply the snapped state
-    if (target === 'peek') {
-      // Dismisses the panel — same as tapping the close button
-      clearMapSelection();
-    } else if (target === 'half') {
-      paneStageEl.classList.remove('is-minimized', 'is-expanded');
-      if (activeLastLatlng) {
-        setTimeout(() => flyToMobileVisibleCenter(activeLastLatlng), SHEET_TRANSITION_MS);
-      }
-    } else {
-      // full
-      paneStageEl.classList.remove('is-minimized');
-      paneStageEl.classList.add('is-expanded');
-      if (activeLastLatlng) {
-        setTimeout(() => flyToMobileVisibleCenter(activeLastLatlng), SHEET_TRANSITION_MS);
-      }
-    }
+    _drag = null;
 
-    dragState = null;
+    // Project 180ms forward to honour flick momentum
+    const projectedY = currentY + velocity * 180;
+
+    // Snap to nearest valid state for this panel
+    const snaps = panel === 'info' ? INFO_SNAPS : LIST_SNAPS;
+    const nearest = snaps
+      .map((s) => ({ state: s, dist: Math.abs(projectedY - snapY(s)) }))
+      .sort((a, b) => a.dist - b.dist)[0].state;
+
+    applyMobileState(nearest);
   }
 
-  function updateInfoBannerTitle() {
-    if (!isMobileView()) return;
-    const isOpen = infoSidebarEl?.dataset.mobileState === 'open';
-
-    ensureSidebarBanner(infoSidebarEl, {
-      title:       'Area Info',
-      handleLabel: 'Area info',
-      expanded:    isOpen,
-      showHandle:  false,
-      onToggle: () => {
-        if (infoSidebarEl.dataset.mobileState === 'hidden') return;
-        const minimized = toggleMobileStageMinimized();
-        infoSidebarEl.dataset.mobileState = minimized ? 'minimized' : 'open';
-        updateInfoBannerTitle();
-      },
-      actionText:  '← Back to list',
-      actionLabel: 'Back to areas list',
-      onAction: () => {
-        if (!isMobileView()) return;
-        setMobileVerticalState(false);
-        setMapSidebarMobileState('open');
-        setMobilePaneStage('list');
-        setTimeout(() => setInfoSidebarState('hidden'), 420);
-      },
-      rightActionText:  '✕',
-      rightActionLabel: 'Close area info',
-      onRightAction: () => clearMapSelection(),
-      actionGridColumn:      '1',
-      titleGridColumn:       '2',
-      rightActionGridColumn: '3',
-      handleGridColumn:      '3',
-    });
+  function wireSheetBannerDrag(zoneId, panel) {
+    const zone = document.getElementById(zoneId);
+    if (!zone) return;
+    zone.addEventListener('touchstart',  (e) => onBannerDragStart(e, panel), { passive: false });
+    zone.addEventListener('touchmove',   onBannerDragMove,  { passive: false });
+    zone.addEventListener('touchend',    onBannerDragEnd,   { passive: false });
+    zone.addEventListener('touchcancel', onBannerDragEnd,   { passive: false });
   }
 
 
@@ -971,9 +777,7 @@
     setActiveAreaItem(null, null);
 
     if (isMobileView()) {
-      paneStageEl?.classList.remove('is-info-view', 'is-expanded');
-      paneStageEl?.classList.add('is-minimized');
-      setMobileHomeState({ hideInfoAfterTransition: true });
+      applyMobileState('hidden');
     } else {
       closeInfoPanel();
     }
@@ -1229,23 +1033,18 @@
     const scrollEl = infoContentEl.querySelector('.mmpopup__scroll');
     if (scrollEl) scrollEl.scrollTop = 0;
 
-    updateInfoBannerTitle();
+    // Update info banner title if area name is available
+    const infoBannerTitle = document.getElementById('info-banner-title');
+    if (infoBannerTitle) {
+      infoBannerTitle.textContent = features.length === 1
+        ? (getVal(features[0].properties, 'Full_Name') || getVal(features[0].properties, 'Full_name') || 'Area Info')
+        : `${features.length} Areas`;
+    }
 
     if (isMobileView()) {
-      // Reset to half state whenever a new panel opens
-      paneStageEl?.classList.remove('is-minimized', 'is-expanded');
-      paneStageEl?.classList.add('is-info-view');
-      setMobileInfoPaneVisibility(true);
-      setInfoSidebarState('open');
-      setMobilePaneStage('info');
-      ensureInfoDragHandle();
-
-      // After sheet settles, centre feature in the visible strip above
-      if (latlng) {
-        setTimeout(() => flyToMobileVisibleCenter(latlng), SHEET_TRANSITION_MS);
-      }
+      applyMobileState('info-half');
     } else {
-      setInfoSidebarState('expanded');
+      infoSidebarEl.classList.add('active');
     }
 
     hasEverSelected = true;
@@ -1262,10 +1061,10 @@
   // setInfoSidebarState('hidden') internally.
   function closeInfoPanel() {
     if (isMobileView()) {
-      setMobileHomeState({ hideInfoAfterTransition: true });
+      applyMobileState('hidden');
       return;
     }
-    setInfoSidebarState('hidden');
+    infoSidebarEl.classList.remove('active');
   }
 
 
@@ -1634,6 +1433,18 @@
 
   // Desktop close button
   closeInfoBtnEl?.addEventListener('click', clearMapSelection);
+
+  // Mobile banner buttons
+  document.getElementById('info-back-btn')?.addEventListener('click', () => {
+    applyMobileState('hidden');
+  });
+  document.getElementById('info-close-btn')?.addEventListener('click', () => {
+    clearMapSelection();
+  });
+
+  // Wire drag zones to the state machine
+  wireSheetBannerDrag('list-drag-zone', 'list');
+  wireSheetBannerDrag('info-drag-zone', 'info');
 
   // Info panel — single delegated listener for all dynamic content:
   // tab buttons, summary accordion toggle, and image carousel
