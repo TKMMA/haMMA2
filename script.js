@@ -9,19 +9,21 @@
    3.  DOM references
    4.  Utilities — data helpers, text formatting
    5.  Map initialisation
-   6.  Responsive / layout helpers
-   7.  Mobile state machine & drag
-   8.  Active area selection
-   9.  Map geometry & viewport helpers
-   10. Map layer styles — hover, selection, flash
-   11. Map selection / clear
-   12. Info panel — HTML builders
-   13. Info panel — open / close
-   14. Sidebar — population
-   15. Sidebar — interactions
-   16. Data loading
-   17. Event wiring
-   18. Boot
+   6.  Compact mode
+   7.  Responsive / layout helpers
+   8.  Sheet banners
+   9.  Active area selection
+   10. Map geometry & viewport helpers
+   11. Map layer styles — hover, selection, flash
+   12. Info hint
+   13. Map selection / clear
+   14. Info panel — HTML builders
+   15. Info panel — open / close
+   16. Sidebar — population
+   17. Sidebar — interactions
+   18. Data loading
+   19. Event wiring
+   20. Boot
    ============================================================ */
 
 (function () {
@@ -347,17 +349,12 @@
     list.classList.toggle('is-collapsed', yState === 'hidden');
 
     // ── Info panel visibility ───────────────────────────────────
-    // Keep the info panel active (visible, interactive) whenever we're in
-    // info-view — including the collapsed 'hidden' state — so the banner
-    // tab remains tappable to restore. Only mark offscreen when fully on
-    // the list side.
+    // Keep the info panel active whenever we're in info-view (including
+    // collapsed 'hidden' state) so the banner tab remains tappable.
     info.classList.toggle('is-offscreen', !isInfoView);
     info.classList.toggle('active',       isInfoView);
 
     // ── Schedule fly-to after sheet settles ─────────────────────
-    // Re-fly whenever the info panel snaps to a new position (including
-    // dragging to info-full) so the selection stays centred in the
-    // visible strip above the sheet. Skip on skipRecentre (resize/orientation).
     if (isInfoView && nextState !== 'hidden' && !opts.skipRecentre) {
       scheduleMobileFly(activeLastBounds, activeLastLatlng);
     }
@@ -498,7 +495,7 @@
     zone.addEventListener('touchend',    onBannerDragEnd,   { passive: false });
     zone.addEventListener('touchcancel', onBannerDragEnd,   { passive: false });
 
-    // Tap (no drag) on the info tab when collapsed → restore to info-half
+    // Tap on the info tab when collapsed → restore to info-half
     if (panel === 'info') {
       zone.addEventListener('click', () => {
         if (mobileState === 'hidden' && paneStageEl?.classList.contains('is-info-view')) {
@@ -794,15 +791,12 @@
     setActiveAreaItem(null, null);
 
     if (isMobileView()) {
-      // Explicitly clear is-info-view before applying list state so the
-      // x-position snaps back to the list pane (not the info-hidden state).
+      // Clear is-info-view so x-position snaps back to list pane
       paneStageEl?.classList.remove('is-info-view');
       applyMobileState('list-open');
     } else {
       closeInfoPanel();
     }
-
-
   }
 
 
@@ -1013,11 +1007,10 @@
 
     const label = btn.querySelector('.mmpopup__summary-trigger-label');
     if (label) {
-      // Restore the count prefix when collapsing — read it from aria-label or data attribute
-      const count = btn.dataset.areaCount || '';
+      const areaCount = btn.dataset.areaCount || '';
       label.textContent = expand
         ? 'Hide combined rules'
-        : `${count} Overlapping Areas — See combined fishing rules`;
+        : `${areaCount} Overlapping Areas — See combined fishing rules`;
     }
   }
 
@@ -1042,9 +1035,7 @@
     const count     = features.length;
     const cardsHtml = features.map((f, i) => buildAreaCard(f, `area-${i}`)).join('');
 
-    // Multi-area: a full-width branded action banner sits between the
-    // panel header and the area cards. It shows the count + CTA in one
-    // confident row and is the sole trigger for the summary card.
+    // Multi-area: full-width branded action banner — count + CTA in one row.
     // Single area: no banner needed.
     const popupHeaderHtml = isMulti
       ? `<button
@@ -1088,6 +1079,7 @@
     } else {
       infoSidebarEl.classList.add('active');
     }
+
 
     if (options.source === 'menu' && activeSelectionMarker) {
       map.removeLayer(activeSelectionMarker);
@@ -1209,6 +1201,7 @@
       islandListEl?.scrollTo({ top: header.offsetTop - 2, behavior: 'smooth' });
     }
   }
+
 
   function zoomToArea(islandName, areaName) {
     setActiveAreaItem(islandName, areaName);
@@ -1435,7 +1428,6 @@
 
             layer.on('click', (e) => {
               L.DomEvent.stopPropagation(e);
-
               // Collect ALL features under this click point across all visible
               // layers, then open the panel once. We use a microtask so that
               // if two overlapping polygons both fire their click handler in
@@ -1526,6 +1518,9 @@
     applyMobileState(infoToListState(mobileState));
   });
 
+  // Wire drag zones to the state machine.
+  // List side: the brand panel itself is the drag surface.
+  // Info side: the info-mobile-header contains the drag zone.
   // Wire drag zones — the protruding tab is the touch target for both panels.
   wireSheetBannerDrag('list-drag-zone', 'list');
   wireSheetBannerDrag('info-drag-zone', 'info');
