@@ -111,6 +111,7 @@
   let isCompactMode          = false; // eslint-disable-line no-unused-vars
   let activeLastLatlng       = null;  // last latlng used to open the info panel
   let dragState              = null;  // active drag session data
+  let _flyTimer              = null;  // pending mobile fly-to timer
 
 
   // ── 3. DOM REFERENCES ────────────────────────────────────────
@@ -297,7 +298,9 @@
   // applyMobileState() is the ONLY place that touches mobile CSS classes.
   // Everything else just calls applyMobileState(nextState).
 
-  let mobileState = 'hidden';
+  let mobileState    = 'hidden';
+  let lastListState  = 'list-open'; // remembered when switching to info view
+  let activeLastBounds = null;      // L.LatLngBounds of current selection
 
   // Snap positions as a fraction of screen height (stage Y offset)
   // These mirror the CSS custom property values in style.css
@@ -312,43 +315,62 @@
     return H * 0.92 - bh;
   }
 
+  // Map an info state to its matching list state (same Y height)
+  function infoToListState(state) {
+    if (state === 'info-full') return 'list-full';
+    return 'list-open'; // info-half → list-open
+  }
+
   function applyMobileState(nextState, opts = {}) {
     if (!isMobileView()) return;
-    mobileState = nextState;
 
-    const stage   = paneStageEl;
-    const list    = mapSidebarEl;
-    const info    = infoSidebarEl;
+    const prevState = mobileState;
+    mobileState     = nextState;
+
+    const stage = paneStageEl;
+    const list  = mapSidebarEl;
+    const info  = infoSidebarEl;
     if (!stage || !list || !info) return;
 
-    // ── X position ─────────────────────────────────────────────
     const isInfoView = nextState === 'info-half' || nextState === 'info-full';
+    const wasInfoView = prevState === 'info-half' || prevState === 'info-full';
+
+    // ── Remember list state when transitioning into info view ──
+    if (!wasInfoView && isInfoView) {
+      // Entering info: remember which list height we came from
+      lastListState = (prevState === 'list-full') ? 'list-full' : 'list-open';
+    }
+
+    // ── X position ─────────────────────────────────────────────
     stage.classList.toggle('is-info-view', isInfoView);
 
     // ── Y position ─────────────────────────────────────────────
+    // When going back to list from info, match the info panel's height
+    let yState = nextState;
+    if (wasInfoView && !isInfoView && nextState !== 'hidden') {
+      yState = infoToListState(prevState);
+      mobileState = yState; // keep state consistent
+    }
+
     stage.classList.remove('is-hidden', 'is-open', 'is-full');
-    if (nextState === 'hidden') {
+    if (yState === 'hidden') {
       stage.classList.add('is-hidden');
-    } else if (nextState === 'list-open' || nextState === 'info-half') {
+    } else if (yState === 'list-open' || yState === 'info-half') {
       stage.classList.add('is-open');
     } else {
       stage.classList.add('is-full');
     }
 
     // ── List panel ─────────────────────────────────────────────
-    list.classList.toggle('is-collapsed', nextState === 'hidden');
+    list.classList.toggle('is-collapsed', yState === 'hidden');
 
     // ── Info panel visibility ───────────────────────────────────
-    // Keep info in DOM but visually hidden when showing list
-    // so the 200vw layout doesn't collapse
-    const infoVisible = isInfoView;
-    info.classList.toggle('is-offscreen', !infoVisible);
-    info.classList.toggle('active',       infoVisible);
+    info.classList.toggle('is-offscreen', !isInfoView);
+    info.classList.toggle('active',       isInfoView);
 
-    // ── After transition, centre the selected polygon ───────────
-    if (infoVisible && activeLastLatlng) {
-      if (opts.skipRecentre) return;
-      setTimeout(() => flyToMobileVisibleCenter(activeLastLatlng), SHEET_TRANSITION_MS);
+    // ── Schedule fly-to after sheet settles ─────────────────────
+    if (isInfoView && !opts.skipRecentre) {
+      scheduleMobileFly(activeLastBounds, activeLastLatlng);
     }
   }
 
@@ -520,23 +542,30 @@
     const size = map.getSize();
 
     if (isMobileView()) {
-      const brandBottom = brandPanelEl?.getBoundingClientRect().bottom || 0;
+      const H   = size.y;
+      const bh  = 48; // --sheet-banner-h
+
+      // Top inset: brand panel height + breathing room
+      // Read once from DOM (brand panel doesn't animate)
+      const brandBottom = brandPanelEl?.getBoundingClientRect().bottom || 70;
       const mapTop      = map.getContainer().getBoundingClientRect().top;
       const topInset    = Math.max(padding, Math.ceil(brandBottom - mapTop) + 10);
 
-      const overlayHeights = [mapSidebarEl, infoSidebarEl]
-        .filter((el) => el && (el === mapSidebarEl || el.classList.contains('active')))
-        .map((el) => {
-          const rect = el.getBoundingClientRect();
-          return Math.max(0, map.getContainer().getBoundingClientRect().bottom - rect.top);
-        });
+      // Bottom inset: derived from mobileState, NOT live DOM rect
+      // This is stable even while the sheet is mid-transition
+      let sheetTopFraction;
+      if (mobileState === 'hidden')                           sheetTopFraction = 0.92;
+      else if (mobileState === 'list-open' || mobileState === 'info-half') sheetTopFraction = 0.50;
+      else                                                    sheetTopFraction = 0.08;
 
-      const bottomInset = Math.max(...overlayHeights, Math.round(size.y * 0.35));
+      const sheetTopPx  = Math.round(H * sheetTopFraction);
+      const bottomInset = Math.max(H - sheetTopPx + bh, Math.round(H * 0.10));
+
       return {
         left:    padding,
         right:   size.x - padding,
         top:     topInset,
-        bottom:  Math.max(topInset + 20, size.y - bottomInset),
+        bottom:  Math.max(topInset + 40, size.y - bottomInset),
         centerX: size.x / 2,
       };
     }
@@ -594,27 +623,56 @@
   }
 
 
-  // Pan so that latlng sits at the centre of the visible map strip above
-  // the mobile bottom sheet. Called after the sheet animation settles.
-  // Corrects both X and Y — unlike flySelectionIntoVisibleArea which is
-  // desktop-only and only corrects X (no vertical overlay on desktop).
-  function flyToMobileVisibleCenter(latlng, duration = 0.6) {
-    if (!latlng || !isMobileView()) return;
+  // Fit and centre the selection in the visible map strip above the sheet.
+  // Cancels any in-flight pending call so two selections never race.
+  // bounds: L.LatLngBounds of the selected feature (for zoom-to-fit).
+  // latlng: centre point to centre on (used when bounds not available).
+  function flyToMobileVisible(bounds, latlng) {
+    if (!isMobileView()) return;
+    if (_flyTimer) { clearTimeout(_flyTimer); _flyTimer = null; }
+    const center = latlng || (bounds ? bounds.getCenter() : null);
+    if (!center) return;
 
-    const rect           = getVisibleMapRect();
-    const visibleCenterX = rect.centerX;
-    const visibleCenterY = rect.top + (rect.bottom - rect.top) / 2;
+    const rect = getVisibleMapRect();
+    const visW  = rect.right  - rect.left;
+    const visH  = rect.bottom - rect.top;
 
-    const point  = map.latLngToContainerPoint(latlng);
-    const deltaX = Math.round(visibleCenterX - point.x);
-    const deltaY = Math.round(visibleCenterY - point.y);
+    if (bounds) {
+      // Fit the polygon into the visible strip, then Leaflet centres it there
+      const padL = rect.left;
+      const padR = map.getSize().x - rect.right;
+      const padT = rect.top;
+      const padB = map.getSize().y - rect.bottom;
+      map.flyToBounds(bounds, {
+        paddingTopLeft:     [padL, padT],
+        paddingBottomRight: [padR, padB],
+        animate: true,
+        duration: 0.8,
+        easeLinearity: 0.2,
+        maxZoom: 16,
+      });
+    } else {
+      // No bounds — just re-centre on the point
+      const visibleCenterX = rect.centerX;
+      const visibleCenterY = rect.top + visH / 2;
+      const point  = map.latLngToContainerPoint(center);
+      const delta  = L.point(
+        Math.round(visibleCenterX - point.x),
+        Math.round(visibleCenterY - point.y),
+      );
+      if (Math.abs(delta.x) < 4 && Math.abs(delta.y) < 4) return;
+      const target = map.containerPointToLatLng(L.point(point.x + delta.x, point.y + delta.y));
+      map.flyTo(target, map.getZoom(), { animate: true, duration: 0.7, easeLinearity: 0.25 });
+    }
+  }
 
-    // Already centred — skip to avoid unnecessary map movement
-    if (Math.abs(deltaX) < 4 && Math.abs(deltaY) < 4) return;
-
-    const targetPoint  = L.point(point.x + deltaX, point.y + deltaY);
-    const targetLatLng = map.containerPointToLatLng(targetPoint);
-    map.flyTo(targetLatLng, map.getZoom(), { animate: true, duration, easeLinearity: 0.25 });
+  // Schedule a fly-to after the sheet settles, cancelling any previous pending call.
+  function scheduleMobileFly(bounds, latlng, delay = SHEET_TRANSITION_MS) {
+    if (_flyTimer) { clearTimeout(_flyTimer); _flyTimer = null; }
+    _flyTimer = setTimeout(() => {
+      _flyTimer = null;
+      flyToMobileVisible(bounds, latlng);
+    }, delay);
   }
 
   // Point-in-polygon using ray casting
@@ -761,6 +819,8 @@
 
   // ── 13. MAP SELECTION / CLEAR ────────────────────────────────
   function clearMapSelection(options = {}) {
+    if (_flyTimer) { clearTimeout(_flyTimer); _flyTimer = null; }
+    activeLastBounds = null;
     const hadSelection = Boolean(
       activeSelectionMarker ||
       activeAccordionLayer  ||
@@ -959,34 +1019,67 @@
     btn.classList.add('active');
   }
 
-  function toggleSummaryAccordion(btn) {
-    // btn is the .mmpopup__header--toggle button
-    const isExpanded = btn.getAttribute('aria-expanded') === 'true';
-    const nextState  = !isExpanded;
-    btn.setAttribute('aria-expanded', String(nextState));
+  // Expand or collapse the summary panel.
+  // Uses max-height animation so collapse is smooth (not a snap).
+  function setSummaryExpanded(btn, expand) {
+    if (!btn) return;
+    btn.setAttribute('aria-expanded', String(expand));
 
-    // Find the inline panel — first sibling inside .mmpopup__scroll
     const scroll = btn.closest('.mmpopup')?.querySelector('.mmpopup__scroll');
     const panel  = scroll?.querySelector('.summary-accordion__panel--inline');
-    if (panel) panel.hidden = !nextState;
+    if (!panel) return;
 
-    // Update label text
+    if (expand) {
+      // Measure natural height, animate to it, then clear max-height
+      // so content can grow freely (e.g. on resize)
+      panel.hidden = false;
+      panel.style.maxHeight = panel.scrollHeight + 'px';
+      panel.style.opacity   = '1';
+      panel.style.pointerEvents = '';
+      // After transition ends, release the fixed height
+      const onEnd = () => {
+        panel.style.maxHeight = '';
+        panel.removeEventListener('transitionend', onEnd);
+      };
+      panel.addEventListener('transitionend', onEnd);
+    } else {
+      // Pin current height first so CSS transition has a start value
+      panel.style.maxHeight    = panel.scrollHeight + 'px';
+      panel.style.opacity      = '1';
+      // Force reflow so the pinned value takes effect before we set 0
+      panel.getBoundingClientRect();
+      panel.style.maxHeight    = '0';
+      panel.style.opacity      = '0';
+      panel.style.pointerEvents = 'none';
+      const onEnd = () => {
+        panel.hidden = true;
+        panel.removeEventListener('transitionend', onEnd);
+      };
+      panel.addEventListener('transitionend', onEnd);
+    }
+
     const label = btn.querySelector('.mmpopup__summary-trigger-label');
     if (label) {
-      label.textContent = nextState
+      label.textContent = expand
         ? 'Hide consolidated fishing rules'
         : 'See consolidated fishing rules summary';
     }
   }
 
-  // No-op kept for compatibility — panel is now always accessible via header
+  function toggleSummaryAccordion(btn) {
+    const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+    setSummaryExpanded(btn, !isExpanded);
+  }
+
+  // No-op kept for compatibility
   function collapseSummaryAccordion() {}
 
 
   // ── 15. INFO PANEL — OPEN / CLOSE ────────────────────────────
   function openInfoPanel(latlng, features, options = {}) {
-    // Store for re-centring after resize
-    activeLastLatlng = latlng || null;
+    // Store for re-centring after resize / state change
+    activeLastLatlng  = latlng || null;
+    activeLastBounds  = null; // set by zoomToArea for list selections
 
     const isMulti     = features.length > 1;
     const headerTitle = isMulti ? `${features.length} Areas Selected` : '1 Area Selected';
@@ -1031,7 +1124,44 @@
       </div>`;
 
     const scrollEl = infoContentEl.querySelector('.mmpopup__scroll');
-    if (scrollEl) scrollEl.scrollTop = 0;
+    if (scrollEl) {
+      scrollEl.scrollTop = 0;
+
+      // Auto-collapse the summary when scrolling up past it.
+      // Only triggers on upward scroll to avoid a jump when scrolling down.
+      let _lastScrollTop   = 0;
+      let _collapseTimer   = null;
+
+      scrollEl.addEventListener('scroll', () => {
+        const currentTop = scrollEl.scrollTop;
+        const scrollingUp = currentTop < _lastScrollTop;
+        _lastScrollTop = currentTop;
+
+        if (!scrollingUp) return;
+
+        const summaryPanel = scrollEl.querySelector('.summary-accordion__panel--inline');
+        const toggleBtn    = infoContentEl.querySelector('.mmpopup__header--toggle');
+        if (!summaryPanel || !toggleBtn) return;
+        if (toggleBtn.getAttribute('aria-expanded') !== 'true') return;
+
+        // Check if the panel's bottom has scrolled above the container top
+        const panelBottom    = summaryPanel.getBoundingClientRect().bottom;
+        const containerTop   = scrollEl.getBoundingClientRect().top;
+
+        if (panelBottom <= containerTop) {
+          if (_collapseTimer) return; // already pending
+          _collapseTimer = setTimeout(() => {
+            _collapseTimer = null;
+            // Re-check in case user scrolled back down during debounce
+            const pb  = summaryPanel.getBoundingClientRect().bottom;
+            const ct  = scrollEl.getBoundingClientRect().top;
+            if (pb <= ct && toggleBtn.getAttribute('aria-expanded') === 'true') {
+              setSummaryExpanded(toggleBtn, false);
+            }
+          }, 200);
+        }
+      }, { passive: true });
+    }
 
     // Update info banner title if area name is available
     const infoBannerTitle = document.getElementById('info-banner-title');
@@ -1194,10 +1324,11 @@
 
       map.stop();
 
-      // ── Mobile: open the panel immediately (sheet opens, then
-      //    openInfoPanel's setTimeout centres the polygon in the visible
-      //    strip above the settled sheet). No desktop-style flyToBounds.
+      // ── Mobile: store bounds then open panel.
+      //    applyMobileState schedules flyToMobileVisible which uses the
+      //    bounds to fit AND centre the polygon in the visible strip.
       if (isMobileView()) {
+        activeLastBounds = bounds;
         openPanel();
         flashLayerBorder(layer);
         return;
@@ -1385,8 +1516,15 @@
                     getVal(hits[0].properties, 'Island'),
                     getVal(hits[0].properties, 'Full_Name') || getVal(hits[0].properties, 'Full_name'),
                   );
+                  // Store bounds for map-tap selections so fly-to can zoom-to-fit
+                  if (isMobileView()) {
+                    try {
+                      activeLastBounds = L.geoJSON(hits[0]).getBounds();
+                    } catch (_) { activeLastBounds = null; }
+                  }
                 } else {
                   setActiveAreaItem(null, null);
+                  activeLastBounds = null;
                 }
                 openInfoPanel(e.latlng, hits, { source: 'map' });
               } else {
@@ -1436,7 +1574,8 @@
 
   // Mobile banner buttons
   document.getElementById('info-back-btn')?.addEventListener('click', () => {
-    applyMobileState('hidden');
+    // Slide back to list at the same height the info panel was at
+    applyMobileState(infoToListState(mobileState));
   });
   document.getElementById('info-close-btn')?.addEventListener('click', () => {
     clearMapSelection();
