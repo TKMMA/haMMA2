@@ -50,24 +50,20 @@
 
       <aside id="info-sidebar" class="info-sidebar sheet-panel" role="region" aria-label="Area details" aria-live="polite">
 
-        <!-- Desktop header — title + close button -->
+        <!-- Desktop header — title only, no close button -->
         <div class="info-panel-header" id="info-panel-header">
           <span class="info-panel-header__title" id="info-banner-title" aria-live="polite">Area Info</span>
-          <button id="close-info-btn" class="info-panel-header__close"
-            type="button" aria-label="Close area info">✕</button>
         </div>
 
-        <!-- Mobile header — gradient matching list side, with drag grip + back + title + close -->
+        <!-- Mobile header — drag tab above, then back + title row below -->
         <div class="info-mobile-header" id="info-banner" aria-hidden="true">
-          <div class="sheet-banner__drag-zone" id="info-drag-zone">
+          <div class="sheet-banner__drag-zone" id="info-drag-zone" aria-hidden="true">
             <div class="sheet-banner__grip"></div>
           </div>
           <div class="info-mobile-header__row">
             <button class="info-mobile-header__back" id="info-back-btn"
               type="button" aria-label="Back to areas list">← Areas</button>
             <span class="info-mobile-header__title" id="info-banner-title-mobile">Area Info</span>
-            <button class="info-mobile-header__close" id="info-close-btn"
-              type="button" aria-label="Close area info">✕</button>
           </div>
         </div>
 
