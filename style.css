@@ -65,7 +65,6 @@
   --info-panel-width:      var(--sidebar-width);
   --panel-margin:          15px;
   --panel-gap:             calc(var(--panel-margin) + 12px);
-  --panel-stack-offset:    0px;
   --top-band-height:       50px;
   --sheet-handle-height:   48px;
   --border-radius-sm:      6px;
@@ -700,26 +699,6 @@ a {
   flex-shrink: 0;
 }
 
-.mmpopup__summary-context-list {
-  display: none;
-  margin: 0;
-  padding: 0 14px 10px 30px;
-  list-style: disc;
-  background: var(--color-brand-accordion);
-}
-
-.mmpopup__summary-context-item {
-  font-size: 11px;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.92);
-  line-height: 1.35;
-  text-align: left;
-}
-
-.mmpopup__header--toggle[aria-expanded="true"] .mmpopup__summary-context-list {
-  display: block;
-}
-
 /* Rotate chevron when expanded */
 .mmpopup__header--toggle[aria-expanded="true"] .mmpopup__summary-trigger-chevron {
   transform: rotate(180deg);
@@ -748,7 +727,7 @@ a {
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
-  padding: 0 12px 10px;
+  padding: 10px 12px 10px;
 }
 
 .mmpopup__scroll::-webkit-scrollbar { width: 5px; }
@@ -759,59 +738,18 @@ a {
 
 .mmpopup__scroll > * { max-width: 100%; }
 
-
-/* ── 13. SUMMARY ACCORDION ──────────────────────────────────── */
-.summary-accordion {
-  margin: 0 0 12px;
-  background: var(--color-surface-base);
+/* Area name list inside the expanded summary panel */
+.summary-area-list {
+  margin: 0 0 10px;
+  padding: 0 0 0 18px;
+  list-style: disc;
 }
 
-.summary-accordion__toggle {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  border: 2px solid var(--color-brand-accordion);
-  border-radius: var(--border-radius-md);
-  background: var(--color-brand-light);
-  color: var(--color-text-accordion);
-  padding: 12px 14px;
-  text-align: left;
+.summary-area-name {
   font-size: 12px;
-  font-weight: 700;
-  position: relative;
-  z-index: 13;
-  transition: background var(--duration-fast);
-}
-
-.summary-accordion__toggle:hover { background: var(--color-brand-accordion-hover); }
-
-.summary-accordion__label { line-height: 1.35; }
-
-.summary-accordion__chevron {
-  font-size: 11px;
-  color: var(--color-text-muted);
-  transition: transform 0.25s ease;
-  flex-shrink: 0;
-}
-
-.summary-accordion.expanded .summary-accordion__chevron { transform: rotate(180deg); }
-
-.summary-accordion__panel { display: none; }
-.summary-accordion.expanded .summary-accordion__panel { display: block; }
-
-.summary-accordion.expanded .summary-accordion__toggle {
-  border-bottom: none;
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.summary-accordion .mmcard--summary {
-  margin-bottom: 0;
-  border-top: none;
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1.5;
 }
 
 
@@ -827,10 +765,9 @@ a {
 
 .mmcard--summary {
   border: 1px solid var(--color-border-brand);
-  border-top: none;
   background: var(--color-surface-search);
   color: var(--color-text-primary);
-  margin-bottom: 14px !important;
+  margin-bottom: 14px;
 }
 
 .mmcard--summary .mm-bullet-text {
@@ -1231,7 +1168,6 @@ a {
 
   /* Safe-area scroll padding */
   .mmpopup__scroll {
-    scroll-padding-top: 0;
     padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
 
