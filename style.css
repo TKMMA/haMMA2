@@ -433,12 +433,11 @@ a {
 
 .info-sidebar.active { transform: translateX(0); }
 
-/* Desktop header bar — title + close button */
+/* Desktop header bar — title only */
 .info-panel-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 12px 0 14px;
+  padding: 0 14px;
   min-height: var(--top-band-height);
   background: var(--color-surface-search);
   border-bottom: 1px solid var(--color-border-brand);
@@ -452,26 +451,6 @@ a {
   color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-}
-
-.info-panel-header__close {
-  width: 28px;
-  height: 28px;
-  background: transparent;
-  border: 1px solid var(--color-border-mid);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  flex-shrink: 0;
-  transition: background var(--duration-fast), color var(--duration-fast);
-}
-
-.info-panel-header__close:hover {
-  background: var(--color-border-light);
-  color: var(--color-text-primary);
 }
 
 
@@ -570,23 +549,7 @@ a {
   outline-offset: -3px;
 }
 
-/* Top row: area count */
-.mmpopup__summary-banner__count {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 14px;
-  min-height: var(--top-band-height);
-  background: var(--color-surface-search);
-  border-bottom: 1px solid var(--color-border-brand);
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-/* Bottom row: the prominent CTA — full gradient brand treatment */
+/* Single-row CTA — count + action text + chevron */
 .mmpopup__summary-banner__cta {
   display: flex;
   align-items: center;
@@ -1138,50 +1101,40 @@ a {
 
   .brand-panel:active { cursor: grabbing; }
 
-  /* Drag grip lives at the very top of the brand panel */
+  /* Drag zone is only the protruding tab above the sheet —
+     keeps the logos/title row untouched and fully visible */
   .brand-panel .sheet-banner__drag-zone {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    padding-top: 0;
-    pointer-events: none; /* brand-panel itself is the touch target */
-    z-index: 2;
-    touch-action: none;
-  }
-
-  /* Protruding tab above the sheet */
-  .brand-panel .sheet-banner__drag-zone::before {
-    content: '';
     position: absolute;
     top: calc(-1 * var(--sheet-tab-h));
     left: 50%;
     transform: translateX(-50%);
     width: 64px;
     height: var(--sheet-tab-h);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    touch-action: none;
     background: var(--color-brand-darkest);
     border-radius: 10px 10px 0 0;
     box-shadow: -2px -3px 6px rgba(0,0,0,0.18);
+    pointer-events: auto;
   }
 
+  /* Grip lines live inside the tab */
   .brand-panel .sheet-banner__grip {
     position: relative;
     z-index: 1;
-    margin-top: 8px;
-    flex-shrink: 0;
   }
 
-  /* Logos row sits below the grip inside the brand panel */
+  /* Logos row */
   .brand-panel .brand-header {
     position: relative;
     z-index: 1;
-    padding: 2px 12px 6px;
+    padding: 8px 12px;
     pointer-events: none;
+    flex: 1;
+    align-items: center;
   }
 
   .brand-logo { width: 26px; height: 26px; }
@@ -1203,45 +1156,37 @@ a {
 
   .info-mobile-header:active { cursor: grabbing; }
 
-  /* Drag zone covers the full header */
+  /* Drag zone is only the protruding tab above the header — NOT the full header.
+     This means the back button row is never covered and always tappable. */
   .info-mobile-header .sheet-banner__drag-zone {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    pointer-events: none;
-    z-index: 2;
-    touch-action: none;
-  }
-
-  /* Protruding tab */
-  .info-mobile-header .sheet-banner__drag-zone::before {
-    content: '';
     position: absolute;
     top: calc(-1 * var(--sheet-tab-h));
     left: 50%;
     transform: translateX(-50%);
     width: 64px;
     height: var(--sheet-tab-h);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    touch-action: none;
     background: var(--color-brand-darkest);
     border-radius: 10px 10px 0 0;
     box-shadow: -2px -3px 6px rgba(0,0,0,0.18);
+    pointer-events: auto;
   }
 
+  /* Grip lines live inside the tab */
   .info-mobile-header .sheet-banner__grip {
     position: relative;
     z-index: 1;
-    margin-top: 8px;
-    flex-shrink: 0;
   }
 
-  /* Back / title / close row */
+  /* Back / title row — full height, always tappable */
   .info-mobile-header__row {
     display: flex;
     align-items: center;
-    padding: 2px 4px 6px;
+    padding: 0 4px;
     gap: 4px;
     flex: 1;
     position: relative;
