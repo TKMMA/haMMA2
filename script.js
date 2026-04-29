@@ -333,7 +333,7 @@
     const info  = infoSidebarEl;
     if (!stage || !list || !info) return;
 
-    const isInfoView = nextState === 'info-closed' || nextState === 'info-half' || nextState === 'info-full';
+    const isInfoView = nextState === 'info-half' || nextState === 'info-full';
     const wasInfoView = prevState === 'info-half' || prevState === 'info-full';
 
     // ── Remember list state when transitioning into info view ──
@@ -425,7 +425,7 @@
 
   // Snap states available from each view
   const LIST_SNAPS = ['hidden', 'list-open', 'list-full'];
-  const INFO_SNAPS = ['info-closed', 'info-half', 'info-full'];
+  const INFO_SNAPS = ['list-open', 'info-half', 'info-full'];
 
   let _drag = null; // active drag session
 
@@ -949,7 +949,7 @@
 
   function buildCarousel(images, areaName) {
     if (!images.length) return '';
-    const encodedImages = images.map((u) => encodeURIComponent(encodeURI(u))).join('|');
+    const encodedImages = images.map((u) => encodeURIComponent(u)).join('|');
     const multi = images.length > 1;
     const dots = multi
       ? `<div class="mmcard__image-dots" aria-hidden="true">
@@ -957,9 +957,7 @@
              `<span class="mmcard__image-dot${i === 0 ? ' is-active' : ''}"></span>`
            ).join('')}
          </div>`
-      : `<div class="mmpopup__header-inner">
-           <span class="mmpopup__header-title">${headerTitle}</span>
-         </div>`;
+      : '';
     const navButtons = multi
       ? `<button
            class="mmcard__image-nav mmcard__image-prev"
@@ -991,7 +989,7 @@
       getVal(props, 'Area_Image_URL_1'),
       getVal(props, 'Area_Image_URL_2'),
       getVal(props, 'Area_Image_URL_3'),
-    ].filter(Boolean).map((url) => encodeURI(String(url).trim()));
+    ].filter(Boolean).map((url) => String(url).trim());
 
     return `
       <div class="area-section mmcard">
