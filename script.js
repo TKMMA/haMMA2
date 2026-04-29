@@ -932,10 +932,25 @@
     return `
       <div class="summary-field-block">
         <div class="summary-section-title">${title}</div>
-        ${items.map((item) => `
-          <div class="area-label">${escapeHtml(item.name)}:</div>
-          <div class="rule-rich-text">${formatRuleText(item.val)}</div>
-        `).join('')}
+        ${SUMMARY_RULE_ORDER.map((bucket) => {
+          if (!grouped[bucket].size) return '';
+          return `<div class="summary-category">
+            <div class="summary-category__title">${SUMMARY_RULE_LABELS[bucket]}</div>
+            <div class="summary-category__list">
+              ${Array.from(grouped[bucket].values()).map((item) => `
+                <div class="summary-rule-item">
+                  <span class="summary-rule-item__text">${escapeHtml(item.text)}</span>
+                  <span class="summary-rule-item__sources">
+                    ${Array.from(item.sources).sort((a, b) => a - b).map((sourceNum) => `
+                      <span class="source-chip" style="--chip-color:${SOURCE_CHIP_COLORS[(sourceNum - 1) % SOURCE_CHIP_COLORS.length]}" title="Source area ${sourceNum}">
+                        <span class="sr-only">Source area ${sourceNum}</span>${sourceNum}
+                      </span>
+                    `).join('')}
+                  </span>
+                </div>`).join('')}
+            </div>
+          </div>`;
+        }).join('')}
       </div>`;
   }
 
