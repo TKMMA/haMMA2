@@ -9,21 +9,19 @@
    3.  DOM references
    4.  Utilities — data helpers, text formatting
    5.  Map initialisation
-   6.  Compact mode
-   7.  Responsive / layout helpers
-   8.  Sheet banners
-   9.  Active area selection
-   10. Map geometry & viewport helpers
-   11. Map layer styles — hover, selection, flash
-   12. Info hint
-   13. Map selection / clear
-   14. Info panel — HTML builders
-   15. Info panel — open / close
-   16. Sidebar — population
-   17. Sidebar — interactions
-   18. Data loading
-   19. Event wiring
-   20. Boot
+   6.  Responsive / layout helpers
+   7.  Mobile state machine & drag
+   8.  Active area selection
+   9.  Map geometry & viewport helpers
+   10. Map layer styles — hover, selection, flash
+   11. Map selection / clear
+   12. Info panel — HTML builders
+   13. Info panel — open / close
+   14. Sidebar — population
+   15. Sidebar — interactions
+   16. Data loading
+   17. Event wiring
+   18. Boot
    ============================================================ */
 
 (function () {
@@ -40,15 +38,10 @@
 
   const INITIAL_CHAIN_BOUNDS = L.latLngBounds([[18.9, -160.55], [22.35, -154.75]]);
 
-  const FALLBACK_REGS_URL =
-    'https://dlnr.hawaii.gov/dar/fishing/fishing-regulations/';
-
   // Must match --duration-slow in style.css (400ms) + small buffer
   const SHEET_TRANSITION_MS = 420;
 
-  const MOBILE_BREAKPOINT = window.matchMedia('(max-width: 768px)');
-
-  // ── FIELD SCHEMA ─────────────────────────────────────────────
+  const MOBILE_BREAKPOINT = window.matchMedia('(max-width: 768px)'); ─────────────────────────────────────────────
   // Single source of truth for every field that appears in the info panel.
   // To add, remove, or re-label a field: edit this config only — no need to
   // touch the rendering functions below.
@@ -103,7 +96,6 @@
   let activeSelectionMarker  = null;
   let activeAccordionLayer   = null;
   let activeHoverLayer       = null;
-  let hasEverSelected        = false;
   let activeLastLatlng       = null;  // last latlng used to open the info panel
   let _flyTimer              = null;  // pending mobile fly-to timer
 
@@ -885,7 +877,7 @@
     return `
       <div class="summary-accordion__panel--inline" hidden>
         <div class="mmcard mmcard--summary">
-          <div class="mmcard__body mmcard__body--summary">
+          <div class="mmcard__body">
             <div class="summary-card-label">Combined Fishing Rules</div>
             <ul class="summary-area-list">${areaListHtml}</ul>
             <div class="summary-field-stack">
@@ -1091,8 +1083,6 @@
     } else {
       infoSidebarEl.classList.add('active');
     }
-
-    hasEverSelected = true;
 
     if (options.source === 'menu' && activeSelectionMarker) {
       map.removeLayer(activeSelectionMarker);
@@ -1523,7 +1513,6 @@
 
   // Search
   areaSearchEl?.addEventListener('input',  () => { syncSearchClearVisibility(); filterSidebar(); });
-  areaSearchEl?.addEventListener('focus',  () => filterSidebar());
   searchClearEl?.addEventListener('click', clearSidebarSearch);
 
   // Desktop close button
