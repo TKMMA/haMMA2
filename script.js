@@ -82,16 +82,14 @@
     laws: [
       { key: 'HAR_Name',  label: 'HAR Name' },
       { key: 'HAR_Link',  label: 'HAR Document', format: 'link', linkText: 'View HAR PDF ›' },
-      { key: 'Statewide_Regs', label: 'Statewide Regulations', format: 'bullet' },
-      { key: 'Additional_Rules', label: 'Additional Rules', format: 'bullet' },
-      { key: 'Management_Authority', label: 'Management Authority', format: 'bullet' },
-      { key: 'Enforcement_Authority', label: 'Enforcement Authority', format: 'bullet' },
-      { key: 'HRS', label: 'HRS' },
-      { key: 'HRS_1', label: 'HRS 1' },
-      { key: 'HRS_2', label: 'HRS 2' },
-      { key: 'HRS_3', label: 'HRS 3' },
-      { key: 'Law_Name', label: 'Law Name' },
-      { key: 'Law_Link', label: 'Law Link', format: 'link', linkText: 'View law link ›' },
+      { key: 'HRS_Name',  label: 'HRS Name' },
+      { key: 'HRS_Link',  label: 'HRS Document', format: 'link', linkText: 'View HRS document ›' },
+      { key: 'Law_Other_Name_1', urlKey: 'Law_Other_URL_1', label: 'Other Law Reference', format: 'textLink', linkText: 'View reference ›' },
+      { key: 'Law_Other_Name_2', urlKey: 'Law_Other_URL_2', label: 'Other Law Reference', format: 'textLink', linkText: 'View reference ›' },
+      { key: 'State_Fishing_Regs_Text', urlKey: 'State_Fishing_Regs_URL', label: 'Statewide Fishing Regulations', format: 'textLink', linkText: 'View statewide regulations ›' },
+      { key: 'Rules_Also_Text', urlKey: 'Rules_Also_URL', label: 'Additional Rules', format: 'textLink', linkText: 'View additional rules ›' },
+      { key: 'Mgmt_Auth', label: 'Management Authority', format: 'bullet' },
+      { key: 'Enf_Auth', label: 'Enforcement Authority', format: 'bullet' },
       { key: 'Penalties', label: 'Penalties',    format: 'bullet' },
     ],
   };
@@ -934,6 +932,18 @@
       const safeUrl = getSafeUrl(value);
       if (!safeUrl) return '';
       return `<a class="reg-link" href="${safeUrl}" target="_blank" rel="noopener">${entry.linkText || safeUrl}</a>`;
+    }
+    if (entry.format === 'textLink') {
+      const textVal = getVal(props, entry.key);
+      const safeUrl = getSafeUrl(getVal(props, entry.urlKey));
+      if (!textVal && !safeUrl) return '';
+      const textHtml = textVal
+        ? `<div class="field-block"><div class="field-block__label">${entry.label}</div><div>${escapeHtml(textVal)}</div></div>`
+        : '';
+      const linkHtml = safeUrl
+        ? `<a class="reg-link" href="${safeUrl}" target="_blank" rel="noopener">${entry.linkText || safeUrl}</a>`
+        : '';
+      return `${textHtml}${linkHtml}`;
     }
 
     const display =
