@@ -41,7 +41,9 @@
   // Must match --duration-slow in style.css (400ms) + small buffer
   const SHEET_TRANSITION_MS = 420;
 
-  const MOBILE_BREAKPOINT = window.matchMedia('(max-width: 768px)'); ─────────────────────────────────────────────
+  const MOBILE_BREAKPOINT = window.matchMedia('(max-width: 768px)');
+
+  // ── FIELD SCHEMA ─────────────────────────────────────────────
   // Single source of truth for every field that appears in the info panel.
   // To add, remove, or re-label a field: edit this config only — no need to
   // touch the rendering functions below.
