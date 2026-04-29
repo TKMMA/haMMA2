@@ -733,6 +733,14 @@ a {
   line-height: 1;
   flex-shrink: 0;
 }
+.source-chip--1 { background: #275DAD; }
+.source-chip--2 { background: #A741E0; }
+.source-chip--3 { background: #0C7A63; }
+.source-chip--4 { background: #B54708; }
+.source-chip--5 { background: #915930; }
+.source-chip--6 { background: #9A3412; }
+.source-chip--7 { background: #0E7490; }
+.source-chip--8 { background: #475569; }
 
 .mmcard__body { padding: 14px; }
 
@@ -971,6 +979,13 @@ a {
 .summary-category__list {
   display: grid;
   gap: 6px;
+}
+.summary-explainer,
+.summary-empty,
+.summary-source-legend__label {
+  font-size: 12px;
+  color: rgba(255,255,255,0.9);
+  margin: 0 0 8px;
 }
 
 .summary-rule-item {

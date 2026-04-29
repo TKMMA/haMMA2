@@ -102,14 +102,13 @@
     title:    f.label,
     fieldKey: f.key,
   }));
-  const SUMMARY_RULE_ORDER = ['prohibited', 'allowed', 'allowed_limits', 'other'];
-  const SUMMARY_RULE_LABELS = {
+  const SUMMARY_GROUP_ORDER = ['prohibited', 'allowed', 'limited', 'other'];
+  const SUMMARY_GROUP_LABELS = {
     prohibited: 'Prohibited',
     allowed: 'Allowed',
-    allowed_limits: 'Allowed with limits',
+    limited: 'Allowed with limits',
     other: 'Other / notes',
   };
-  const SOURCE_CHIP_COLORS = ['#275DAD', '#A741E0', '#0C7A63', '#B54708', '#915930', '#9A3412'];
 
 
 
@@ -242,15 +241,56 @@
     }).join('');
   }
 
+  function buildSummarySources(features) {
+    return features.map((feature, index) => ({
+      id: index + 1,
+      feature,
+      name: getVal(feature.properties, 'Full_name') || getVal(feature.properties, 'Full_Name') || 'Unknown Area',
+      className: `source-chip--${(index % 8) + 1}`,
+    }));
+  }
+
+  function renderSourceChip(source) {
+    return `<span class="source-chip ${source.className}" title="Source ${source.id}: ${escapeHtml(source.name)}" aria-label="Source ${source.id}: ${escapeHtml(source.name)}">
+      <span class="sr-only">Source </span>${source.id}
+    </span>`;
+  }
+
+  function renderSourceChips(sources) {
+    return sources.map((s) => renderSourceChip(s)).join('');
+  }
+
+  function splitRuleLines(text) {
+    if (!text || text === 'N/A') return [];
+    return normalizeRuleSegments(text)
+      .replace(/([^\n])\s+(?=(?:Prohibited|Allowed(?:\s+with\s+limits|\s+with\s+limitations)?)[^:\n]*:?\s*)/gi, '$1\n')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+  }
+
   function classifyRuleLine(line) {
-    const normalized = String(line).trim();
-    const lower = normalized.toLowerCase();
-    if (/(^|[\s-])prohibited\b/.test(lower)) return 'prohibited';
-    if (/(^|[\s-])allowed\b/.test(lower) && /(limit|limits|only|up to|max|maximum|per | bag|size|season|time|days?)/.test(lower)) {
-      return 'allowed_limits';
-    }
-    if (/(^|[\s-])allowed\b/.test(lower)) return 'allowed';
+    const value = String(line).trim();
+    const lower = value.toLowerCase();
+    if (/^prohibited\b/.test(lower)) return 'prohibited';
+    if (/^allowed\b.*\b(limit|limits|limitation|limitations)\b/.test(lower) || /^allowed\s+with\s+limits?\b/.test(lower)) return 'limited';
+    if (/^allowed\b/.test(lower)) return 'allowed';
     return 'other';
+  }
+
+  function parseRuleField(text) {
+    return splitRuleLines(text).map((line) => ({
+      text: line,
+      status: classifyRuleLine(line),
+    }));
+  }
+
+  function normalizeRuleForMerge(text) {
+    return String(text)
+      .replace(/\s+/g, ' ')
+      .replace(/[.]+$/g, '.')
+      .trim()
+      .toLowerCase();
   }
 
   function collectImageUrls(props) {
@@ -917,65 +957,67 @@
       .join('');
   }
 
-  // Summary card block — temporary area-by-area rendering.
-  // This keeps overlap and single-area render paths separate while we
-  // prepare for the next-step grouped summary engine.
-  function buildSummaryBlock(title, fieldKey, features) {
-    const items = features
-      .map((f) => ({
-        name: getVal(f.properties, 'Full_name') || getVal(f.properties, 'Full_Name'),
-        val:  getVal(f.properties, fieldKey),
-      }))
-      .filter((i) => i.val);
-    if (!items.length) return '';
-
-    return `
-      <div class="summary-field-block">
-        <div class="summary-section-title">${title}</div>
-        ${SUMMARY_RULE_ORDER.map((bucket) => {
-          if (!grouped[bucket].size) return '';
-          return `<div class="summary-category">
-            <div class="summary-category__title">${SUMMARY_RULE_LABELS[bucket]}</div>
-            <div class="summary-category__list">
-              ${Array.from(grouped[bucket].values()).map((item) => `
-                <div class="summary-rule-item">
-                  <span class="summary-rule-item__text">${escapeHtml(item.text)}</span>
-                  <span class="summary-rule-item__sources">
-                    ${Array.from(item.sources).sort((a, b) => a - b).map((sourceNum) => `
-                      <span class="source-chip" style="--chip-color:${SOURCE_CHIP_COLORS[(sourceNum - 1) % SOURCE_CHIP_COLORS.length]}" title="Source area ${sourceNum}">
-                        <span class="sr-only">Source area ${sourceNum}</span>${sourceNum}
-                      </span>
-                    `).join('')}
-                  </span>
-                </div>`).join('')}
-            </div>
-          </div>`;
-        }).join('')}
-      </div>`;
+  function buildCombinedRulesSummary(features) {
+    const sources = buildSummarySources(features);
+    const categories = SUMMARY_SCHEMA.map((schemaRow) => {
+      const grouped = {
+        prohibited: new Map(),
+        allowed: new Map(),
+        limited: new Map(),
+        other: new Map(),
+      };
+      sources.forEach((source) => {
+        const val = getVal(source.feature.properties, schemaRow.fieldKey);
+        if (!val) return;
+        parseRuleField(val).forEach((parsedLine) => {
+          const key = normalizeRuleForMerge(parsedLine.text);
+          if (!grouped[parsedLine.status].has(key)) {
+            grouped[parsedLine.status].set(key, { text: parsedLine.text, sources: [] });
+          }
+          const item = grouped[parsedLine.status].get(key);
+          if (!item.sources.some((s) => s.id === source.id)) item.sources.push(source);
+        });
+      });
+      const groups = SUMMARY_GROUP_ORDER.map((groupKey) => ({
+        key: groupKey,
+        title: SUMMARY_GROUP_LABELS[groupKey],
+        rules: Array.from(grouped[groupKey].values()),
+      })).filter((group) => group.rules.length > 0 || group.key !== 'other');
+      return { title: schemaRow.title, groups };
+    }).filter((category) => category.groups.some((group) => group.rules.length));
+    return { sources, categories };
   }
 
-  // Build just the collapsible panel content — the trigger button now lives
-  // in the mmpopup header so it's always visible regardless of scroll position.
   function buildSummaryPanel(features) {
-    const areaListHtml = features.map((f, index) => {
-      const name = getVal(f.properties, 'Full_name') || getVal(f.properties, 'Full_Name') || 'Unknown Area';
-      return `<li class="summary-area-name">
-        <span class="source-chip" style="--chip-color:${SOURCE_CHIP_COLORS[index % SOURCE_CHIP_COLORS.length]}" title="Source area ${escapeHtml(name)}">
-          <span class="sr-only">Source area </span>${index + 1}
-        </span>
-        ${escapeHtml(name)}
-      </li>`;
-    }).join('');
-
+    const summary = buildCombinedRulesSummary(features);
+    const hasRules = summary.categories.length > 0;
     return `
       <div class="summary-accordion__panel--inline" hidden>
         <div class="mmcard mmcard--summary">
           <div class="mmcard__body">
-            <div class="summary-card-label">Combined Fishing Rules</div>
-            <ul class="summary-area-list">${areaListHtml}</ul>
-            <div class="summary-field-stack">
-              ${SUMMARY_SCHEMA.map((s) => buildSummaryBlock(s.title, s.fieldKey, features)).join('')}
+            <div class="summary-card-label">Combined rules summary</div>
+            <p class="summary-explainer">Rules are reorganized by category and status. Source chips indicate which selected area each rule line came from.</p>
+            <div class="summary-source-legend">
+              <div class="summary-source-legend__label">Areas included:</div>
+              <ul class="summary-area-list">${summary.sources.map((source) => `<li class="summary-area-name">${renderSourceChip(source)} ${escapeHtml(source.name)}</li>`).join('')}</ul>
             </div>
+            ${hasRules ? `<div class="summary-field-stack">
+              ${summary.categories.map((category) => `
+                <div class="summary-field-block">
+                  <div class="summary-section-title">${escapeHtml(category.title)}</div>
+                  ${category.groups.map((group) => group.rules.length ? `
+                    <div class="summary-category">
+                      <div class="summary-category__title">${group.title}</div>
+                      <div class="summary-category__list">
+                        ${group.rules.map((rule) => `
+                          <div class="summary-rule-item">
+                            <span class="summary-rule-item__text">${escapeHtml(rule.text)}</span>
+                            <span class="summary-rule-item__sources">${renderSourceChips(rule.sources)}</span>
+                          </div>`).join('')}
+                      </div>
+                    </div>` : '').join('')}
+                </div>`).join('')}
+            </div>` : `<p class="summary-empty">No combined rule text is available for these selected areas.</p>`}
           </div>
         </div>
       </div>`;
