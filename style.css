@@ -192,8 +192,6 @@ a {
   line-height: 1.2;
 }
 
-
-
 /* ── 6. MAP SIDEBAR (AREAS LIST) ────────────────────────────── */
 .map-sidebar {
   position: absolute;
@@ -454,6 +452,8 @@ a {
 }
 
 
+
+
 /* ── 11. MOBILE SHEET BANNER ────────────────────────────────── */
 /* .sheet-banner is used by old code paths; hide it globally */
 .sheet-banner { display: none; }
@@ -549,7 +549,7 @@ a {
   outline-offset: -3px;
 }
 
-/* Single-row CTA — count + action text + chevron */
+/* Single-row CTA — count + action + chevron */
 .mmpopup__summary-banner__cta {
   display: flex;
   align-items: center;
@@ -583,16 +583,16 @@ a {
   transform: rotate(180deg);
 }
 
-/* Summary accordion panel — drops down directly below the banner */
+/* Summary panel — drops below banner, same gradient for visual continuity */
 .summary-accordion__panel--inline {
   overflow: hidden;
+  background: linear-gradient(160deg, #0a2a4a, var(--color-brand-mid));
   transition: max-height 0.35s ease, opacity 0.25s ease;
   opacity: 1;
-  /* Visually connected to the banner — same gradient family, lighter tint */
-  background: linear-gradient(160deg, #0a2a4a, var(--color-brand-mid));
 }
 
 .summary-accordion__panel--inline[hidden] {
+  /* Override [hidden]{ display:none } with a visible-but-collapsed state */
   display: block !important;
   max-height: 0 !important;
   opacity: 0;
@@ -1033,8 +1033,12 @@ a {
   .map-sidebar .sidebar-search-wrap,
   .info-sidebar .info-content { overflow: hidden; }
 
-  /* Island list: fill remaining height after brand panel + search bar,
-     scroll within that space at every snap position */
+  .map-sidebar .island-list {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Scroll containment — both panels fill their visible strip and scroll within it */
   .map-sidebar {
     display: flex;
     flex-direction: column;
@@ -1047,7 +1051,6 @@ a {
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Info content: fill remaining height after mobile header, scroll within it */
   .info-sidebar {
     display: flex;
     flex-direction: column;
@@ -1084,8 +1087,6 @@ a {
   }
 
   /* ── Brand panel as drag surface (list side) ─────────── */
-  /* On mobile the brand panel is the sheet handle.         */
-  /* It must be exactly --sheet-banner-h tall.              */
   .brand-panel {
     width: 100%;
     border-radius: 0;
@@ -1093,16 +1094,12 @@ a {
     height: var(--sheet-banner-h);
     display: flex;
     flex-direction: column;
+    justify-content: center;
     position: relative;
     overflow: visible;
-    touch-action: none;
-    cursor: grab;
   }
 
-  .brand-panel:active { cursor: grabbing; }
-
-  /* Drag zone is only the protruding tab above the sheet —
-     keeps the logos/title row untouched and fully visible */
+  /* Drag zone is only the protruding tab — brand header row is never covered */
   .brand-panel .sheet-banner__drag-zone {
     position: absolute;
     top: calc(-1 * var(--sheet-tab-h));
@@ -1113,15 +1110,16 @@ a {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 2;
-    touch-action: none;
     background: var(--color-brand-darkest);
     border-radius: 10px 10px 0 0;
     box-shadow: -2px -3px 6px rgba(0,0,0,0.18);
-    pointer-events: auto;
+    z-index: 2;
+    touch-action: none;
+    cursor: grab;
   }
 
-  /* Grip lines live inside the tab */
+  .brand-panel .sheet-banner__drag-zone:active { cursor: grabbing; }
+
   .brand-panel .sheet-banner__grip {
     position: relative;
     z-index: 1;
@@ -1131,10 +1129,8 @@ a {
   .brand-panel .brand-header {
     position: relative;
     z-index: 1;
-    padding: 8px 12px;
+    padding: 6px 12px;
     pointer-events: none;
-    flex: 1;
-    align-items: center;
   }
 
   .brand-logo { width: 26px; height: 26px; }
@@ -1144,20 +1140,16 @@ a {
   .info-mobile-header {
     display: flex;
     flex-direction: column;
+    justify-content: center;
     width: 100%;
     height: var(--sheet-banner-h);
     flex-shrink: 0;
     background: linear-gradient(135deg, var(--color-brand-darkest), var(--color-brand-mid));
     position: relative;
     overflow: visible;
-    touch-action: none;
-    cursor: grab;
   }
 
-  .info-mobile-header:active { cursor: grabbing; }
-
-  /* Drag zone is only the protruding tab above the header — NOT the full header.
-     This means the back button row is never covered and always tappable. */
+  /* Drag zone is only the protruding tab — back button row is never covered */
   .info-mobile-header .sheet-banner__drag-zone {
     position: absolute;
     top: calc(-1 * var(--sheet-tab-h));
@@ -1168,15 +1160,16 @@ a {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 2;
-    touch-action: none;
     background: var(--color-brand-darkest);
     border-radius: 10px 10px 0 0;
     box-shadow: -2px -3px 6px rgba(0,0,0,0.18);
-    pointer-events: auto;
+    z-index: 2;
+    touch-action: none;
+    cursor: grab;
   }
 
-  /* Grip lines live inside the tab */
+  .info-mobile-header .sheet-banner__drag-zone:active { cursor: grabbing; }
+
   .info-mobile-header .sheet-banner__grip {
     position: relative;
     z-index: 1;
