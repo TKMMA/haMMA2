@@ -993,26 +993,26 @@
     const hasRules = summary.categories.length > 0;
     return `
       <div class="summary-accordion__panel--inline" hidden>
-        <div class="mmcard mmcard--summary">
-          <div class="mmcard__body">
+        <div class="mmcard mmcard--summary overlap-summary-card">
+          <div class="mmcard__body overlap-summary-intro">
             <div class="summary-card-label">Combined rules summary</div>
             <p class="summary-explainer">Rules are reorganized by category and status. Source chips indicate which selected area each rule line came from.</p>
-            <div class="summary-source-legend">
+            <div class="summary-source-legend overlap-source-list">
               <div class="summary-source-legend__label">Areas included:</div>
-              <ul class="summary-area-list">${summary.sources.map((source) => `<li class="summary-area-name">${renderSourceChip(source)} ${escapeHtml(source.name)}</li>`).join('')}</ul>
+              <ul class="summary-area-list">${summary.sources.map((source) => `<li class="summary-area-name overlap-source-item">${renderSourceChip(source)} ${escapeHtml(source.name)}</li>`).join('')}</ul>
             </div>
             ${hasRules ? `<div class="summary-field-stack">
               ${summary.categories.map((category) => `
                 <div class="summary-field-block">
                   <div class="summary-section-title">${escapeHtml(category.title)}</div>
                   ${category.groups.map((group) => group.rules.length ? `
-                    <div class="summary-category">
+                    <div class="summary-category summary-rule-group">
                       <div class="summary-category__title">${group.title}</div>
-                      <div class="summary-category__list">
+                      <div class="summary-category__list summary-rule-list">
                         ${group.rules.map((rule) => `
                           <div class="summary-rule-item">
                             <span class="summary-rule-item__text">${escapeHtml(rule.text)}</span>
-                            <span class="summary-rule-item__sources">${renderSourceChips(rule.sources)}</span>
+                            <span class="summary-rule-item__sources summary-rule-source-chips">${renderSourceChips(rule.sources)}</span>
                           </div>`).join('')}
                       </div>
                     </div>` : '').join('')}
@@ -1113,9 +1113,9 @@
 
   function renderAreaSpecificSection(features) {
     return `
-      <section class="overlap-areas" aria-label="Area-specific rules">
+      <section class="overlap-areas area-specific-section" aria-label="Area-specific rules">
         <h4 class="overlap-areas__title">Area-specific rules</h4>
-        <p class="overlap-areas__copy">The summary above reorganizes rules by activity. These cards preserve the original rules for each selected area.</p>
+        <p class="overlap-areas__copy">These cards preserve the original rules for each selected area.</p>
         ${features.map((f, i) => buildAreaCard(f, `area-${i}`)).join('')}
       </section>`;
   }
@@ -1132,7 +1132,8 @@
           data-area-count="${count}"
         >
           <span class="mmpopup__summary-banner__cta">
-            <span class="mmpopup__summary-trigger-label">${count} Overlapping Areas — See combined fishing rules</span>
+            <span class="mmpopup__summary-trigger-label">Combined rules summary</span>
+            <span class="mmpopup__summary-trigger-help">Multiple regulated areas overlap here. Expand this summary to review rules reorganized by activity.</span>
             <span class="mmpopup__summary-trigger-chevron" aria-hidden="true">▼</span>
           </span>
         </button>
@@ -1196,10 +1197,9 @@
 
     const label = btn.querySelector('.mmpopup__summary-trigger-label');
     if (label) {
-      const areaCount = btn.dataset.areaCount || '';
       label.textContent = expand
-        ? 'Hide combined rules'
-        : `${areaCount} Overlapping Areas — See combined fishing rules`;
+        ? 'Hide combined rules summary'
+        : 'Combined rules summary';
     }
   }
 
