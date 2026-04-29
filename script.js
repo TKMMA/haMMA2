@@ -538,38 +538,9 @@
     return Math.max(0, Math.max(...rightEdges) - mapRect.left);
   }
 
+  // Desktop-only — mobile uses flyToMobileVisible directly without rects.
   function getVisibleMapRect(padding = 30) {
     const size = map.getSize();
-
-    if (isMobileView()) {
-      const H   = size.y;
-      const bh  = 48; // --sheet-banner-h
-
-      // Top inset: brand panel height + breathing room
-      // Read once from DOM (brand panel doesn't animate)
-      const brandBottom = brandPanelEl?.getBoundingClientRect().bottom || 70;
-      const mapTop      = map.getContainer().getBoundingClientRect().top;
-      const topInset    = Math.max(padding, Math.ceil(brandBottom - mapTop) + 10);
-
-      // Bottom inset: derived from mobileState, NOT live DOM rect
-      // This is stable even while the sheet is mid-transition
-      let sheetTopFraction;
-      if (mobileState === 'hidden')                           sheetTopFraction = 0.92;
-      else if (mobileState === 'list-open' || mobileState === 'info-half') sheetTopFraction = 0.50;
-      else                                                    sheetTopFraction = 0.08;
-
-      const sheetTopPx  = Math.round(H * sheetTopFraction);
-      const bottomInset = Math.max(H - sheetTopPx + bh, Math.round(H * 0.10));
-
-      return {
-        left:    padding,
-        right:   size.x - padding,
-        top:     topInset,
-        bottom:  Math.max(topInset + 40, size.y - bottomInset),
-        centerX: size.x / 2,
-      };
-    }
-
     const leftOverlayWidth = getLeftOverlayWidth();
     return {
       left:    leftOverlayWidth + padding,
@@ -627,43 +598,63 @@
   // Cancels any in-flight pending call so two selections never race.
   // bounds: L.LatLngBounds of the selected feature (for zoom-to-fit).
   // latlng: centre point to centre on (used when bounds not available).
+  // Place a polygon in the visible strip above the mobile bottom sheet.
+  // Approach: pick a target zoom, compute the target screen position
+  // (centre of visible strip), then offset the map centre by the difference.
   function flyToMobileVisible(bounds, latlng) {
     if (!isMobileView()) return;
     if (_flyTimer) { clearTimeout(_flyTimer); _flyTimer = null; }
     const center = latlng || (bounds ? bounds.getCenter() : null);
     if (!center) return;
 
-    const rect = getVisibleMapRect();
-    const visW  = rect.right  - rect.left;
-    const visH  = rect.bottom - rect.top;
+    const screenW = map.getSize().x;
+    const screenH = map.getSize().y;
 
+    // ── Where on screen do we want the polygon to land? ───────────
+    // Centre of the visible strip = above the sheet top, below the brand panel.
+    const SHEET_TOP_FRACTION = {
+      'hidden':    0.92,
+      'list-open': 0.50,
+      'list-full': 0.08,
+      'info-half': 0.50,
+      'info-full': 0.08,
+    };
+    const sheetTopY = screenH * (SHEET_TOP_FRACTION[mobileState] ?? 0.50);
+    const brandBot  = (brandPanelEl?.getBoundingClientRect().bottom || 70)
+                    - map.getContainer().getBoundingClientRect().top;
+    const stripTop  = brandBot + 16;
+    const stripCenterY = (stripTop + sheetTopY) / 2;
+    const stripCenterX = screenW / 2;
+
+    // ── Pick a zoom that fits the polygon in the visible strip ────
+    let targetZoom = map.getZoom();
     if (bounds) {
-      // Fit the polygon into the visible strip, then Leaflet centres it there
-      const padL = rect.left;
-      const padR = map.getSize().x - rect.right;
-      const padT = rect.top;
-      const padB = map.getSize().y - rect.bottom;
-      map.flyToBounds(bounds, {
-        paddingTopLeft:     [padL, padT],
-        paddingBottomRight: [padR, padB],
-        animate: true,
-        duration: 0.8,
-        easeLinearity: 0.2,
-        maxZoom: 16,
-      });
-    } else {
-      // No bounds — just re-centre on the point
-      const visibleCenterX = rect.centerX;
-      const visibleCenterY = rect.top + visH / 2;
-      const point  = map.latLngToContainerPoint(center);
-      const delta  = L.point(
-        Math.round(visibleCenterX - point.x),
-        Math.round(visibleCenterY - point.y),
+      const stripH = sheetTopY - stripTop;
+      const stripW = screenW - 40; // 20px side padding
+      // Use a synthetic point as padding to fit-zoom into our strip
+      targetZoom = map.getBoundsZoom(
+        bounds,
+        false,
+        L.point(Math.max(40, screenW - stripW), Math.max(40, screenH - stripH)),
       );
-      if (Math.abs(delta.x) < 4 && Math.abs(delta.y) < 4) return;
-      const target = map.containerPointToLatLng(L.point(point.x + delta.x, point.y + delta.y));
-      map.flyTo(target, map.getZoom(), { animate: true, duration: 0.7, easeLinearity: 0.25 });
+      targetZoom = Math.min(targetZoom, 16);
     }
+
+    // ── Compute target latlng: where the map centre needs to be so       ──
+    // ── that `center` ends up at (stripCenterX, stripCenterY) on screen. ──
+    // Project at the target zoom (not current zoom!), then offset.
+    const centerPoint   = map.project(center, targetZoom);
+    const screenCenter  = map.project(map.getCenter(), targetZoom);
+    const offsetX       = stripCenterX - screenW / 2;
+    const offsetY       = stripCenterY - screenH / 2;
+    const targetMapPoint = centerPoint.subtract(L.point(offsetX, offsetY));
+    const targetLatLng   = map.unproject(targetMapPoint, targetZoom);
+
+    map.flyTo(targetLatLng, targetZoom, {
+      animate: true,
+      duration: 0.8,
+      easeLinearity: 0.2,
+    });
   }
 
   // Schedule a fly-to after the sheet settles, cancelling any previous pending call.
