@@ -614,6 +614,7 @@ a {
   border-top-right-radius: var(--border-radius-lg);
   flex-shrink: 0;
   overflow: hidden;
+  padding: 0 12px;
 }
 
 /* Default single-area header — centred label */
@@ -638,8 +639,9 @@ a {
   display: flex;
   flex-direction: column;
   width: 100%;
-  border: none;
-  background: none;
+  border: 1px solid var(--color-border-brand);
+  border-radius: var(--border-radius-md);
+  background: var(--color-surface-search);
   cursor: pointer;
   padding: 0;
   font-family: var(--font);
@@ -671,7 +673,7 @@ a {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 9px 14px;
+  padding: 10px 14px;
   background: var(--color-brand-accordion);
   transition: background var(--duration-fast);
 }
@@ -688,6 +690,26 @@ a {
   color: rgba(255,255,255,0.85);
   transition: transform 0.25s ease;
   flex-shrink: 0;
+}
+
+.mmpopup__summary-context-list {
+  display: none;
+  margin: 0;
+  padding: 0 14px 10px 30px;
+  list-style: disc;
+  background: var(--color-brand-accordion);
+}
+
+.mmpopup__summary-context-item {
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.35;
+  text-align: left;
+}
+
+.mmpopup__header--toggle[aria-expanded="true"] .mmpopup__summary-context-list {
+  display: block;
 }
 
 /* Rotate chevron when expanded */
@@ -796,15 +818,16 @@ a {
 }
 
 .mmcard--summary {
-  border: 2px solid var(--color-brand-accordion);
+  border: 1px solid var(--color-border-brand);
   border-top: none;
-  background: var(--color-brand-accordion);
-  color: #fff;
+  background: var(--color-surface-search);
+  color: var(--color-text-primary);
+  margin-bottom: 14px !important;
 }
 
 .mmcard--summary .mm-bullet-text {
-  color: #ffffff;
-  font-weight: 600;
+  color: var(--color-text-primary);
+  font-weight: 500;
 }
 
 .mmcard__body { padding: 14px; }
@@ -1372,19 +1395,8 @@ a {
 [hidden] { display: none !important; }
 
 
-.mmcard--summary .mmcard__title,
 .mmcard--summary .summary-section-title,
 .mmcard--summary .area-label,
-.mmcard--summary .rule-rich-text,
-.mmcard--summary .mmtabs button {
-  color: #ffffff;
-}
-
-.mmcard--summary .mmtabs button {
-  border-color: rgba(255,255,255,0.35);
-  background: rgba(255,255,255,0.12);
-}
-
-.mmcard--summary .mmtabs button.active {
-  background: rgba(255,255,255,0.22);
+.mmcard--summary .rule-rich-text {
+  color: var(--color-text-primary);
 }

@@ -900,6 +900,15 @@
       </div>`).join('');
   }
 
+  function buildAreaNamesPlainList(features) {
+    return features.map((f) => `
+      <li class="mmpopup__summary-context-item">${escapeHtml(
+        getVal(f.properties, 'Full_name') ||
+        getVal(f.properties, 'Full_Name') ||
+        'Unknown Area',
+      )}</li>`).join('');
+  }
+
   // Summary card block — driven by SUMMARY_SCHEMA so it stays in sync
   // with the rules tab automatically
   function buildSummaryBlock(title, fieldKey, features) {
@@ -929,10 +938,7 @@
       <div class="summary-accordion__panel--inline" hidden>
         <div class="area-section mmcard mmcard--summary" style="border-top-left-radius:0;border-top-right-radius:0;margin-bottom:0;">
           <div class="mmcard__body mmcard__body--summary">
-            <div class="mmcard__subtitle">${buildAreaNamesList(features)}</div>
-            <div class="mmtabs">
-              <button class="active" type="button">CONSOLIDATED RULES</button>
-            </div>
+           <div class="mmcard__subtitle">${buildAreaNamesList(features)}</div>
             <div class="tab-pane summary-field-stack">
               ${SUMMARY_SCHEMA.map((s) => buildSummaryBlock(s.title, s.fieldKey, features)).join('')}
             </div>
@@ -1124,6 +1130,9 @@
              <span class="mmpopup__summary-trigger-label">Show consolidated fishing rules summary</span>
              <span class="mmpopup__summary-trigger-chevron" aria-hidden="true">▼</span>
            </div>
+           <ul class="mmpopup__summary-context-list">
+             ${buildAreaNamesPlainList(features)}
+           </ul>
          </button>`
       : `<div class="mmpopup__header-inner">
            <span class="mmpopup__header-title">${headerTitle}</span>
