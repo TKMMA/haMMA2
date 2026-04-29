@@ -314,6 +314,8 @@ a {
 /* ── 8. ISLAND LIST & AREA ITEMS ────────────────────────────── */
 .island-list {
   flex: 1;
+  min-height: 0;
+  display: block;
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -1410,18 +1412,22 @@ a {
 .brand-header--compact { align-items:center; }
 .brand-panel--info .brand-title-main { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
 
-@media (max-width: 768px) {
-  .info-sidebar > .brand-panel--info { display: none; }
-  #info-banner { display: flex !important; }
-  .sheet-banner--info .sheet-banner__title { position: static; transform: none; white-space: normal; }
-}
-
 @media (min-width: 769px) {
   .info-sidebar > .brand-panel--info { display: none; }
 }
 
 @media (max-width: 768px) {
+  .info-sidebar > .brand-panel--info { display: none; }
   #list-banner { display:flex !important; }
+  #info-banner { display: flex !important; }
   #info-banner .sheet-banner__drag-zone { justify-content: center; gap: 2px; }
-  #info-banner .sheet-banner__title { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; line-height: 1; }
+  #info-banner .sheet-banner__title {
+    position: static;
+    transform: none;
+    white-space: normal;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    line-height: 1;
+  }
 }
