@@ -301,7 +301,7 @@
   // These mirror the CSS custom property values in style.css
   function snapY(state) {
     const H = window.innerHeight;
-    const bh = 48; // --sheet-banner-h
+    const bh = 58; // --sheet-banner-h (brand panel / info header height)
     if (state === 'hidden')    return H * 0.92 - bh;
     if (state === 'list-open') return H * 0.50 - bh;
     if (state === 'list-full') return H * 0.08;
@@ -618,9 +618,9 @@
     };
     const sheetTopY = screenH * (SHEET_TOP_FRACTION[mobileState] ?? 0.50);
     // Brand panel is inside the sheet on mobile, so getBoundingClientRect()
-    // is unreliable while the sheet is translated. Use a fixed offset instead:
-    // brand panel ≈ 52px tall + 10px top margin = 62px from viewport top.
-    const brandBot  = 62;
+    // is unreliable while the sheet is translated. Use a fixed offset:
+    // brand panel = 58px (--sheet-banner-h) + 10px top margin = 68px.
+    const brandBot  = 68;
     const stripTop  = brandBot + 8;
     const stripCenterY = (stripTop + sheetTopY) / 2;
     const stripCenterX = screenW / 2;
@@ -915,6 +915,7 @@
       <div class="summary-accordion__panel--inline" hidden>
         <div class="mmcard mmcard--summary">
           <div class="mmcard__body mmcard__body--summary">
+            <div class="summary-card-label">Combined Fishing Rules</div>
             <ul class="summary-area-list">${areaListHtml}</ul>
             <div class="summary-field-stack">
               ${SUMMARY_SCHEMA.map((s) => buildSummaryBlock(s.title, s.fieldKey, features)).join('')}
@@ -953,7 +954,7 @@
       : '';
     return `
       <div class="mmcard__image-wrap" data-carousel-index="0">
-        <img class="mmcard__image" src="${escapeHtml(images[0])}" alt="${escapeHtml(areaName)}">
+        <img class="mmcard__image" src="${images[0]}" alt="${escapeHtml(areaName)}" loading="lazy">
         ${navButtons}
         ${dots}
       </div>`;
@@ -1488,34 +1489,52 @@
               L.DomEvent.stopPropagation(e);
               setCompactMode(true);
 
-              const hits = [];
+              // Collect ALL features under this click point across all visible
+              // layers, then open the panel once. We use a microtask so that
+              // if two overlapping polygons both fire their click handler in
+              // the same event (which Leaflet does), we merge them into a
+              // single openInfoPanel call instead of calling it twice.
+              if (!map._haMMA_clickPending) {
+                map._haMMA_clickPending = { latlng: e.latlng, hits: [] };
+                Promise.resolve().then(() => {
+                  const { latlng, hits } = map._haMMA_clickPending;
+                  map._haMMA_clickPending = null;
+
+                  if (!hits.length) { clearMapSelection({ fromClick: true }); return; }
+
+                  if (hits.length === 1) {
+                    setActiveAreaItem(
+                      getVal(hits[0].properties, 'Island'),
+                      getVal(hits[0].properties, 'Full_Name') || getVal(hits[0].properties, 'Full_name'),
+                    );
+                    if (isMobileView()) {
+                      try { activeLastBounds = L.geoJSON(hits[0]).getBounds(); }
+                      catch (_) { activeLastBounds = null; }
+                    }
+                  } else {
+                    setActiveAreaItem(null, null);
+                    activeLastBounds = null;
+                  }
+                  openInfoPanel(latlng, hits, { source: 'map' });
+                });
+              }
+
+              // Accumulate hits for this click point
               Object.values(allIslandLayers).forEach((group) => {
                 if (!map.hasLayer(group)) return;
                 group.eachLayer((l) => {
-                  if (pointInFeatureGeometry(e.latlng, l.feature)) hits.push(l.feature);
+                  if (pointInFeatureGeometry(e.latlng, l.feature)) {
+                    // Avoid duplicates if this feature was already added
+                    const id = getVal(l.feature.properties, 'Full_name') ||
+                               getVal(l.feature.properties, 'Full_Name');
+                    if (!map._haMMA_clickPending.hits.some((f) =>
+                      (getVal(f.properties, 'Full_name') || getVal(f.properties, 'Full_Name')) === id
+                    )) {
+                      map._haMMA_clickPending.hits.push(l.feature);
+                    }
+                  }
                 });
               });
-
-              if (hits.length) {
-                if (hits.length === 1) {
-                  setActiveAreaItem(
-                    getVal(hits[0].properties, 'Island'),
-                    getVal(hits[0].properties, 'Full_Name') || getVal(hits[0].properties, 'Full_name'),
-                  );
-                  // Store bounds for map-tap selections so fly-to can zoom-to-fit
-                  if (isMobileView()) {
-                    try {
-                      activeLastBounds = L.geoJSON(hits[0]).getBounds();
-                    } catch (_) { activeLastBounds = null; }
-                  }
-                } else {
-                  setActiveAreaItem(null, null);
-                  activeLastBounds = null;
-                }
-                openInfoPanel(e.latlng, hits, { source: 'map' });
-              } else {
-                clearMapSelection({ fromClick: true });
-              }
             });
           },
         }).addTo(map);
@@ -1567,9 +1586,11 @@
     clearMapSelection();
   });
 
-  // Wire drag zones to the state machine
-  wireSheetBannerDrag('list-drag-zone', 'list');
-  wireSheetBannerDrag('info-drag-zone', 'info');
+  // Wire drag zones to the state machine.
+  // List side: the brand panel itself is the drag surface.
+  // Info side: the info-mobile-header contains the drag zone.
+  wireSheetBannerDrag('brand-panel', 'list');
+  wireSheetBannerDrag('info-banner', 'info');
 
   // Info panel — single delegated listener for all dynamic content:
   // tab buttons, summary accordion toggle, and image carousel
