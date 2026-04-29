@@ -648,10 +648,6 @@ a {
   text-align: center;
 }
 
-.mmpopup__header--toggle:hover .mmpopup__summary-trigger {
-  background: var(--color-brand-accordion-hover);
-}
-
 .mmpopup__header--toggle:focus-visible {
   outline: 3px solid var(--color-accent);
   outline-offset: -3px;
@@ -1200,10 +1196,14 @@ a {
   }
 
   /* Clip the scrollable content area, not the whole panel */
-  .map-sidebar .island-list,
   .map-sidebar .sidebar-search-wrap,
   .info-sidebar .info-content {
     overflow: hidden;
+  }
+
+  .map-sidebar .island-list {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* Desktop close btn hidden on mobile */
@@ -1303,13 +1303,19 @@ a {
   }
 
   .sheet-banner__title {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: rgba(255,255,255,0.65);
+    color: rgba(255,255,255,0.72);
     line-height: 1;
     z-index: 1;
+    position: absolute;
+    top: calc(-1 * var(--sheet-tab-h) + 5px);
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    pointer-events: none;
   }
 
   /* Back button (info panel only) */

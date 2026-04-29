@@ -310,6 +310,7 @@
     if (state === 'hidden')    return H * 0.92 - bh;
     if (state === 'list-open') return H * 0.50 - bh;
     if (state === 'list-full') return H * 0.08;
+    if (state === 'info-closed') return H * 0.92 - bh;
     if (state === 'info-half') return H * 0.50 - bh;
     if (state === 'info-full') return H * 0.08;
     return H * 0.92 - bh;
@@ -332,7 +333,7 @@
     const info  = infoSidebarEl;
     if (!stage || !list || !info) return;
 
-    const isInfoView = nextState === 'info-half' || nextState === 'info-full';
+    const isInfoView = nextState === 'info-closed' || nextState === 'info-half' || nextState === 'info-full';
     const wasInfoView = prevState === 'info-half' || prevState === 'info-full';
 
     // ── Remember list state when transitioning into info view ──
@@ -353,7 +354,7 @@
     }
 
     stage.classList.remove('is-hidden', 'is-open', 'is-full');
-    if (yState === 'hidden') {
+    if (yState === 'hidden' || yState === 'info-closed') {
       stage.classList.add('is-hidden');
     } else if (yState === 'list-open' || yState === 'info-half') {
       stage.classList.add('is-open');
@@ -424,7 +425,7 @@
 
   // Snap states available from each view
   const LIST_SNAPS = ['hidden', 'list-open', 'list-full'];
-  const INFO_SNAPS = ['hidden', 'info-half', 'info-full'];
+  const INFO_SNAPS = ['info-closed', 'info-half', 'info-full'];
 
   let _drag = null; // active drag session
 
@@ -840,7 +841,7 @@
     setActiveAreaItem(null, null);
 
     if (isMobileView()) {
-      applyMobileState('hidden');
+      applyMobileState('info-closed');
     } else {
       closeInfoPanel();
     }
@@ -938,7 +939,6 @@
       <div class="summary-accordion__panel--inline" hidden>
         <div class="area-section mmcard mmcard--summary" style="border-top-left-radius:0;border-top-right-radius:0;margin-bottom:0;">
           <div class="mmcard__body mmcard__body--summary">
-           <div class="mmcard__subtitle">${buildAreaNamesList(features)}</div>
             <div class="tab-pane summary-field-stack">
               ${SUMMARY_SCHEMA.map((s) => buildSummaryBlock(s.title, s.fieldKey, features)).join('')}
             </div>
@@ -949,7 +949,7 @@
 
   function buildCarousel(images, areaName) {
     if (!images.length) return '';
-    const encodedImages = images.map((u) => encodeURIComponent(u)).join('|');
+    const encodedImages = images.map((u) => encodeURIComponent(encodeURI(u))).join('|');
     const multi = images.length > 1;
     const dots = multi
       ? `<div class="mmcard__image-dots" aria-hidden="true">
@@ -989,7 +989,7 @@
       getVal(props, 'Area_Image_URL_1'),
       getVal(props, 'Area_Image_URL_2'),
       getVal(props, 'Area_Image_URL_3'),
-    ].filter(Boolean);
+    ].filter(Boolean).map((url) => encodeURI(String(url).trim()));
 
     return `
       <div class="area-section mmcard">
@@ -1190,9 +1190,7 @@
     // Update info banner title if area name is available
     const infoBannerTitle = document.getElementById('info-banner-title');
     if (infoBannerTitle) {
-      infoBannerTitle.textContent = features.length === 1
-        ? (getVal(features[0].properties, 'Full_name') || getVal(features[0].properties, 'Full_Name') || 'Area Info')
-        : `${features.length} Areas Selected`;
+      infoBannerTitle.textContent = `${features.length} AREA${features.length === 1 ? '' : 'S'} SELECTED`;
     }
 
     if (isMobileView()) {
@@ -1220,7 +1218,7 @@
   // setInfoSidebarState('hidden') internally.
   function closeInfoPanel() {
     if (isMobileView()) {
-      applyMobileState('hidden');
+      applyMobileState('info-closed');
       return;
     }
     infoSidebarEl.classList.remove('active');
