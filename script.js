@@ -103,8 +103,6 @@
   let activeSelectionMarker  = null;
   let activeAccordionLayer   = null;
   let activeHoverLayer       = null;
-  let infoHintEl             = null;
-  let infoHintTimer          = null;
   let hasEverSelected        = false;
   let activeLastLatlng       = null;  // last latlng used to open the info panel
   let _flyTimer              = null;  // pending mobile fly-to timer
@@ -120,7 +118,6 @@
   const areaSearchEl   = document.getElementById('area-search');
   const searchClearEl  = document.getElementById('search-clear-btn');
   const closeInfoBtnEl = document.getElementById('close-info-btn');
-  const brandPanelEl   = document.getElementById('brand-panel');
 
 
   // ── 4. UTILITIES ─────────────────────────────────────────────
@@ -241,13 +238,6 @@
   ).addTo(map);
 
 
-  // ── 6. COMPACT MODE ──────────────────────────────────────────
-  // Shrinks the brand panel slightly when the user interacts with the map.
-  function setCompactMode(on) {
-    brandPanelEl?.classList.toggle('compact', Boolean(on));
-  }
-
-
   // ── 7. RESPONSIVE / LAYOUT HELPERS ───────────────────────────
   const isMobileView = () => MOBILE_BREAKPOINT.matches;
 
@@ -292,7 +282,7 @@
   // applyMobileState() is the ONLY place that touches mobile CSS classes.
   // Everything else just calls applyMobileState(nextState).
 
-  let mobileState    = 'hidden';
+  let mobileState    = 'list-open';
   let lastListState  = 'list-open'; // remembered when switching to info view
   let activeLastBounds = null;      // L.LatLngBounds of current selection
   let _pendingMoveendHandler = null; // moveend handler waiting on flyToBounds
@@ -372,7 +362,10 @@
     info.classList.toggle('active',       isInfoView);
 
     // ── Schedule fly-to after sheet settles ─────────────────────
-    if (isInfoView && !opts.skipRecentre) {
+    // Re-fly whenever the info panel snaps to a new position (including
+    // dragging to info-full) so the selection stays centred in the
+    // visible strip above the sheet. Skip on skipRecentre (resize/orientation).
+    if (isInfoView && nextState !== 'hidden' && !opts.skipRecentre) {
       scheduleMobileFly(activeLastBounds, activeLastLatlng);
     }
   }
@@ -788,48 +781,6 @@
   }
 
 
-  // ── 12. INFO HINT ────────────────────────────────────────────
-  function ensureInfoHint() {
-    if (infoHintEl) return infoHintEl;
-    if (!mapInterfaceEl) return null;
-
-    const el       = document.createElement('div');
-    el.id          = 'info-empty-hint';
-    el.className   = 'info-empty-hint';
-    el.setAttribute('role',      'status');
-    el.setAttribute('aria-live', 'polite');
-    el.innerHTML   = `
-      <span>Click a shape on the map or an item in the list to see area details.</span>
-      <button class="hint-dismiss" id="hint-dismiss-btn" aria-label="Dismiss hint">✕</button>
-    `;
-    mapInterfaceEl.appendChild(el);
-    el.querySelector('#hint-dismiss-btn').addEventListener('click', hideInfoHint);
-
-    infoHintEl = el;
-    return el;
-  }
-
-  function showInfoHint(opts = {}) {
-    if (isMobileView()) return; // hint is map-level UI, not relevant when map is behind the sheet
-    const el = ensureInfoHint();
-    if (!el) return;
-    if (infoHintTimer) { clearTimeout(infoHintTimer); infoHintTimer = null; }
-    el.classList.add('active');
-    if (opts.persistent) return;
-    infoHintTimer = setTimeout(() => {
-      el.classList.remove('active');
-      infoHintTimer = null;
-    }, 8000);
-  }
-
-  function hideInfoHint() {
-    const el = ensureInfoHint();
-    if (!el) return;
-    if (infoHintTimer) { clearTimeout(infoHintTimer); infoHintTimer = null; }
-    el.classList.remove('active');
-  }
-
-
   // ── 13. MAP SELECTION / CLEAR ────────────────────────────────
   function clearMapSelection(options = {}) {
     if (_flyTimer) { clearTimeout(_flyTimer); _flyTimer = null; }
@@ -858,7 +809,7 @@
       closeInfoPanel();
     }
 
-    if (options.fromClick && hadSelection && hasEverSelected) showInfoHint();
+
   }
 
 
@@ -1069,7 +1020,7 @@
 
     const label = btn.querySelector('.mmpopup__summary-trigger-label');
     if (label) {
-      label.textContent = expand ? 'Hide combined rules' : 'Show combined fishing rules';
+      label.textContent = expand ? 'Hide combined rules' : 'See combined fishing rules';
     }
   }
 
@@ -1094,25 +1045,23 @@
     const count     = features.length;
     const cardsHtml = features.map((f, i) => buildAreaCard(f, `area-${i}`)).join('');
 
-    // Multi-area: popup header doubles as the summary accordion trigger.
-    // Single area: no popup header — the panel header already shows the name.
+    // Multi-area: a full-width branded action banner sits between the
+    // panel header and the area cards. It shows the count + CTA in one
+    // confident row and is the sole trigger for the summary card.
+    // Single area: no banner needed.
     const popupHeaderHtml = isMulti
-      ? `<div class="mmpopup__header">
-           <button
-             class="mmpopup__header--toggle"
-             type="button"
-             aria-expanded="false"
-             data-action="toggle-summary"
-           >
-             <div class="mmpopup__header-row">
-               <span class="mmpopup__header-title">${count} Areas at This Location</span>
-             </div>
-             <div class="mmpopup__summary-trigger">
-               <span class="mmpopup__summary-trigger-label">Show combined fishing rules</span>
-               <span class="mmpopup__summary-trigger-chevron" aria-hidden="true">▼</span>
-             </div>
-           </button>
-         </div>`
+      ? `<button
+           class="mmpopup__summary-banner"
+           type="button"
+           aria-expanded="false"
+           data-action="toggle-summary"
+         >
+           <span class="mmpopup__summary-banner__count">${count} Overlapping Areas</span>
+           <span class="mmpopup__summary-banner__cta">
+             <span class="mmpopup__summary-trigger-label">See combined fishing rules</span>
+             <span class="mmpopup__summary-trigger-chevron" aria-hidden="true">▼</span>
+           </span>
+         </button>`
       : '';
 
     const summaryPanelHtml = isMulti ? buildSummaryPanel(features) : '';
@@ -1144,7 +1093,6 @@
     }
 
     hasEverSelected = true;
-    hideInfoHint();
 
     if (options.source === 'menu' && activeSelectionMarker) {
       map.removeLayer(activeSelectionMarker);
@@ -1194,16 +1142,10 @@
     const headerLeft      = document.createElement('div');
     headerLeft.className  = 'header-left';
 
-    const checkbox    = document.createElement('input');
-    checkbox.type     = 'checkbox';
-    checkbox.checked  = true;
-    checkbox.setAttribute('aria-label', `Show ${islandName} on map`);
-    checkbox.addEventListener('click', (e) => toggleLayerVisibility(e, islandName));
-
     const islandLabel = document.createElement('span');
     islandLabel.textContent = islandName;
 
-    headerLeft.append(checkbox, islandLabel);
+    headerLeft.append(islandLabel);
 
     const chevron     = document.createElement('span');
     chevron.className = 'chevron';
@@ -1273,16 +1215,7 @@
     }
   }
 
-  function toggleLayerVisibility(event, islandName) {
-    event.stopPropagation();
-    const layer = allIslandLayers[islandName];
-    if (!layer) return;
-    if (event.target.checked) map.addLayer(layer);
-    else map.removeLayer(layer);
-  }
-
   function zoomToArea(islandName, areaName) {
-    setCompactMode(true);
     setActiveAreaItem(islandName, areaName);
 
     const layerGroup = allIslandLayers[islandName];
@@ -1507,7 +1440,6 @@
 
             layer.on('click', (e) => {
               L.DomEvent.stopPropagation(e);
-              setCompactMode(true);
 
               // Collect ALL features under this click point across all visible
               // layers, then open the panel once. We use a microtask so that
@@ -1591,7 +1523,7 @@
 
   // Search
   areaSearchEl?.addEventListener('input',  () => { syncSearchClearVisibility(); filterSidebar(); });
-  areaSearchEl?.addEventListener('focus',  () => setCompactMode(true));
+  areaSearchEl?.addEventListener('focus',  () => filterSidebar());
   searchClearEl?.addEventListener('click', clearSidebarSearch);
 
   // Desktop close button
@@ -1601,9 +1533,6 @@
   document.getElementById('info-back-btn')?.addEventListener('click', () => {
     // Slide back to list at the same height the info panel was at
     applyMobileState(infoToListState(mobileState));
-  });
-  document.getElementById('info-close-btn')?.addEventListener('click', () => {
-    clearMapSelection();
   });
 
   // Wire drag zones to the state machine.
@@ -1656,9 +1585,7 @@
   });
 
   // Map events
-  map.on('click',     () => clearMapSelection({ fromClick: true }));
-  map.on('movestart', () => setCompactMode(true));
-
+  map.on('click',     () => { if (!isMobileView()) clearMapSelection({ fromClick: true }); });
   // Resize — debounced so syncResponsiveSidebarState isn't called on every pixel
   let resizeTimer;
   window.addEventListener('resize', () => {
@@ -1681,6 +1608,5 @@
   syncResponsiveSidebarState();
   setInitialMapExtent();
   loadAllFromSingleService();
-  showInfoHint({ persistent: true });
 
 })();
