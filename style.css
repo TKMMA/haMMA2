@@ -1406,6 +1406,12 @@ a {
 }
 
 
-#list-banner, #info-banner { display:none !important; }
+#list-banner { display:none !important; }
 .brand-header--compact { align-items:center; }
 .brand-panel--info .brand-title-main { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+@media (max-width: 768px) {
+  .info-sidebar > .brand-panel--info { display: none; }
+  #info-banner { display: flex !important; }
+  .sheet-banner--info .sheet-banner__title { position: static; transform: none; white-space: normal; }
+}

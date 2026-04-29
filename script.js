@@ -841,7 +841,7 @@
     setActiveAreaItem(null, null);
 
     if (isMobileView()) {
-      applyMobileState('info-closed');
+      applyMobileState('list-open');
     } else {
       closeInfoPanel();
     }
@@ -1134,9 +1134,7 @@
              ${buildAreaNamesPlainList(features)}
            </ul>
          </button>`
-      : `<div class="mmpopup__header-inner">
-           <span class="mmpopup__header-title">${headerTitle}</span>
-         </div>`;
+      : '';
 
     // Summary panel is now just the card content (no outer accordion wrapper)
     // — the trigger lives in the header above
@@ -1144,7 +1142,7 @@
 
     infoContentEl.innerHTML = `
       <div class="mmpopup">
-        <div class="mmpopup__header">${headerHtml}</div>
+        ${headerHtml ? `<div class="mmpopup__header">${headerHtml}</div>` : ''}
         <div class="mmpopup__scroll">
           ${summaryPanelHtml}
           ${dividerHtml}
@@ -1188,10 +1186,10 @@
     }
 
     // Update info banner title if area name is available
-    const infoBannerTitle = document.getElementById('info-banner-title');
-    if (infoBannerTitle) {
-      infoBannerTitle.textContent = `${features.length} AREA${features.length === 1 ? '' : 'S'} SELECTED`;
-    }
+    const infoBannerTitles = [document.getElementById('info-banner-title'), document.getElementById('info-banner-title-mobile')];
+    infoBannerTitles.forEach((el) => {
+      if (el) el.textContent = `${features.length} AREA${features.length === 1 ? '' : 'S'} SELECTED`;
+    });
 
     if (isMobileView()) {
       applyMobileState('info-half');
@@ -1218,7 +1216,7 @@
   // setInfoSidebarState('hidden') internally.
   function closeInfoPanel() {
     if (isMobileView()) {
-      applyMobileState('info-closed');
+      applyMobileState('list-open');
       return;
     }
     infoSidebarEl.classList.remove('active');
