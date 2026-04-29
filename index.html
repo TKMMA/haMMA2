@@ -21,20 +21,18 @@
   <div class="map-interface">
     <div class="pane-stage" id="pane-stage">
       <aside id="map-sidebar" class="map-sidebar sheet-panel" role="complementary" aria-label="Marine and freshwater areas list">
+
+        <!-- Brand panel doubles as mobile drag surface -->
         <header class="brand-panel" id="brand-panel" role="banner">
+          <div class="sheet-banner__drag-zone" id="list-drag-zone" aria-hidden="true">
+            <div class="sheet-banner__grip"></div>
+          </div>
           <div class="brand-header brand-header--compact">
             <img class="brand-logo" src="https://devdar.rapidteksolutions.com/wp-content/themes/react-ts-theme/assets/img/logo-dar.png" alt="Division of Aquatic Resources logo" width="36" height="36" />
             <div class="brand-title-block"><h1 class="brand-title-main">Managed Areas</h1></div>
             <img class="brand-logo" src="https://devdar.rapidteksolutions.com/wp-content/themes/react-ts-theme/assets/img/logo-state-of-hawai.png" alt="State of Hawaiʻi logo" width="36" height="36" />
           </div>
         </header>
-
-        <div class="sheet-banner" id="list-banner" aria-hidden="true">
-          <div class="sheet-banner__drag-zone" id="list-drag-zone">
-            <div class="sheet-banner__grip"></div>
-            <span class="sheet-banner__title">AREAS LIST</span>
-          </div>
-        </div>
 
         <div class="sidebar-search-wrap">
           <div class="search-input-wrapper">
@@ -59,16 +57,18 @@
             type="button" aria-label="Close area info">✕</button>
         </div>
 
-        <!-- Mobile banner — drag handle + back + close -->
-        <div class="sheet-banner sheet-banner--info" id="info-banner" aria-hidden="true">
-          <button class="sheet-banner__back" id="info-back-btn"
-            type="button" aria-label="Back to areas list">← List</button>
+        <!-- Mobile header — gradient matching list side, with drag grip + back + title + close -->
+        <div class="info-mobile-header" id="info-banner" aria-hidden="true">
           <div class="sheet-banner__drag-zone" id="info-drag-zone">
             <div class="sheet-banner__grip"></div>
-            <span class="sheet-banner__title" id="info-banner-title-mobile">Area Info</span>
           </div>
-          <button class="sheet-banner__close" id="info-close-btn"
-            type="button" aria-label="Close area info">✕</button>
+          <div class="info-mobile-header__row">
+            <button class="info-mobile-header__back" id="info-back-btn"
+              type="button" aria-label="Back to areas list">← Areas</button>
+            <span class="info-mobile-header__title" id="info-banner-title-mobile">Area Info</span>
+            <button class="info-mobile-header__close" id="info-close-btn"
+              type="button" aria-label="Close area info">✕</button>
+          </div>
         </div>
 
         <div id="info-content" class="info-content"></div>
