@@ -82,6 +82,16 @@
     laws: [
       { key: 'HAR_Name',  label: 'HAR Name' },
       { key: 'HAR_Link',  label: 'HAR Document', format: 'link', linkText: 'View HAR PDF ›' },
+      { key: 'Statewide_Regs', label: 'Statewide Regulations', format: 'bullet' },
+      { key: 'Additional_Rules', label: 'Additional Rules', format: 'bullet' },
+      { key: 'Management_Authority', label: 'Management Authority', format: 'bullet' },
+      { key: 'Enforcement_Authority', label: 'Enforcement Authority', format: 'bullet' },
+      { key: 'HRS', label: 'HRS' },
+      { key: 'HRS_1', label: 'HRS 1' },
+      { key: 'HRS_2', label: 'HRS 2' },
+      { key: 'HRS_3', label: 'HRS 3' },
+      { key: 'Law_Name', label: 'Law Name' },
+      { key: 'Law_Link', label: 'Law Link', format: 'link', linkText: 'View law link ›' },
       { key: 'Penalties', label: 'Penalties',    format: 'bullet' },
     ],
   };
@@ -92,6 +102,14 @@
     title:    f.label,
     fieldKey: f.key,
   }));
+  const SUMMARY_RULE_ORDER = ['prohibited', 'allowed', 'allowed_limits', 'other'];
+  const SUMMARY_RULE_LABELS = {
+    prohibited: 'Prohibited',
+    allowed: 'Allowed',
+    allowed_limits: 'Allowed with limits',
+    other: 'Other / notes',
+  };
+  const SOURCE_CHIP_COLORS = ['#275DAD', '#A741E0', '#0C7A63', '#B54708', '#915930', '#9A3412'];
 
 
 
@@ -138,8 +156,20 @@
     if (!dateVal || dateVal === 'N/A') return 'N/A';
     const d = new Date(dateVal);
     return Number.isNaN(d.getTime())
-      ? dateVal
-      : `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
+      ? escapeHtml(dateVal)
+      : `${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}/${d.getUTCFullYear()}`;
+  }
+
+  function getSafeUrl(value) {
+    if (!value || value === 'N/A') return null;
+    const raw = String(value).trim();
+    if (!raw) return null;
+    try {
+      const parsed = new URL(raw, window.location.href);
+      return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? parsed.href : null;
+    } catch (_err) {
+      return null;
+    }
   }
 
 
@@ -165,7 +195,7 @@
       .map((l) => `
         <div class="mm-bullet-container">
           <span class="mm-bullet-point">•</span>
-          <span class="mm-bullet-text">${l.replace(/^[•●○◦*-]\s+/, '').trim()}</span>
+          <span class="mm-bullet-text">${escapeHtml(l.replace(/^[•●○◦*-]\s+/, '').trim())}</span>
         </div>`)
       .join('');
   }
@@ -210,6 +240,24 @@
           ${bodyHtml}
         </div>`;
     }).join('');
+  }
+
+  function classifyRuleLine(line) {
+    const normalized = String(line).trim();
+    const lower = normalized.toLowerCase();
+    if (/(^|[\s-])prohibited\b/.test(lower)) return 'prohibited';
+    if (/(^|[\s-])allowed\b/.test(lower) && /(limit|limits|only|up to|max|maximum|per | bag|size|season|time|days?)/.test(lower)) {
+      return 'allowed_limits';
+    }
+    if (/(^|[\s-])allowed\b/.test(lower)) return 'allowed';
+    return 'other';
+  }
+
+  function collectImageUrls(props) {
+    return ['Area_Image_URL_1', 'Area_Image_URL_2', 'Area_Image_URL_3']
+      .map((key) => getVal(props, key))
+      .filter(Boolean)
+      .map((url) => String(url).trim());
   }
 
 
@@ -355,7 +403,9 @@
     info.classList.toggle('active',       isInfoView);
 
     // ── Schedule fly-to after sheet settles ─────────────────────
-    if (isInfoView && nextState !== 'hidden' && !opts.skipRecentre) {
+    const shouldRecentreInfoHalf = isInfoView && nextState === 'info-half' && !opts.skipRecentre;
+    const returningFromFullToHalf = prevState === 'info-full' && nextState === 'info-half';
+    if (shouldRecentreInfoHalf || returningFromFullToHalf) {
       scheduleMobileFly(activeLastBounds, activeLastLatlng);
     }
   }
@@ -558,6 +608,31 @@
     return map.getBoundsZoom(bounds, false, L.point(getLeftOverlayWidth() + 30, 30));
   }
 
+  function getMobileVisibleMapStrip() {
+    const mapRect = map.getContainer().getBoundingClientRect();
+    const stageRect = paneStageEl?.getBoundingClientRect();
+    const sheetTop = stageRect ? Math.max(mapRect.top, stageRect.top) : (mapRect.top + mapRect.height * 0.5);
+    const sidePadding = 16;
+    const topPadding = 10;
+    const bottomPadding = 8;
+    const left = sidePadding;
+    const right = Math.max(left + 40, mapRect.width - sidePadding);
+    const top = topPadding;
+    const bottom = Math.max(top + 24, (sheetTop - mapRect.top) - bottomPadding);
+    const width = Math.max(40, right - left);
+    const height = Math.max(24, bottom - top);
+    return {
+      left,
+      right,
+      top,
+      bottom,
+      width,
+      height,
+      centerX: left + (width / 2),
+      centerY: top + (height / 2),
+    };
+  }
+
   function featureFitsVisibleArea(bounds, padding = 30) {
     const rect = getVisibleMapRect(padding);
     const nw   = map.latLngToContainerPoint(bounds.getNorthWest());
@@ -606,35 +681,24 @@
 
     const screenW = map.getSize().x;
     const screenH = map.getSize().y;
-
-    // ── Where on screen do we want the polygon to land? ───────────
-    // Centre of the visible strip = above the sheet top, below the brand panel.
-    const SHEET_TOP_FRACTION = {
-      'hidden':    0.92,
-      'list-open': 0.50,
-      'list-full': 0.08,
-      'info-half': 0.50,
-      'info-full': 0.08,
-    };
-    const sheetTopY = screenH * (SHEET_TOP_FRACTION[mobileState] ?? 0.50);
-    // Brand panel is inside the sheet on mobile, so getBoundingClientRect()
-    // is unreliable while the sheet is translated. Use a fixed offset:
-    // brand panel = 58px (--sheet-banner-h) + 10px top margin = 68px.
-    const brandBot  = 68;
-    const stripTop  = brandBot + 8;
-    const stripCenterY = (stripTop + sheetTopY) / 2;
+    const strip = getMobileVisibleMapStrip();
+    if (!strip) return;
+    const stripCenterY = strip.centerY;
     const stripCenterX = screenW / 2;
 
     // ── Pick a zoom that fits the polygon in the visible strip ────
     let targetZoom = map.getZoom();
     if (bounds) {
-      const stripH = sheetTopY - stripTop;
-      const stripW = screenW - 40; // 20px side padding
+      if (mobileState === 'info-full' && strip.height < 120) {
+        return;
+      }
+      const stripH = strip.height;
+      const stripW = strip.width;
       // Use a synthetic point as padding to fit-zoom into our strip
       targetZoom = map.getBoundsZoom(
         bounds,
         false,
-        L.point(Math.max(40, screenW - stripW), Math.max(40, screenH - stripH)),
+        L.point(Math.max(32, screenW - stripW), Math.max(32, screenH - stripH)),
       );
       // Clamp to map's zoom range (imagery has no detail past ~17–18)
       const maxZ = map.getMaxZoom?.() ?? 18;
@@ -665,6 +729,17 @@
       _flyTimer = null;
       flyToMobileVisible(bounds, latlng);
     }, delay);
+  }
+
+  function getBoundsForFeatures(features) {
+    if (!features?.length) return null;
+    try {
+      const fc = { type: 'FeatureCollection', features };
+      const bounds = L.geoJSON(fc).getBounds();
+      return bounds?.isValid?.() ? bounds : null;
+    } catch (_err) {
+      return null;
+    }
   }
 
   // Point-in-polygon using ray casting
@@ -809,18 +884,21 @@
   function renderSchemaField(entry, props) {
     // Resolve the value — 'join' format merges multiple keys
     const value = entry.format === 'join'
-      ? (entry.keys || []).map((k) => getVal(props, k)).filter(Boolean).join('<br>')
+      ? (entry.keys || []).map((k) => getVal(props, k)).filter(Boolean)
       : getVal(props, entry.key);
 
     if (!value) return '';
 
     // 'link' format renders as a button-style anchor, no label row needed
     if (entry.format === 'link') {
-      return `<a class="reg-link" href="${escapeHtml(value)}" target="_blank" rel="noopener">${entry.linkText || value}</a>`;
+      const safeUrl = getSafeUrl(value);
+      if (!safeUrl) return '';
+      return `<a class="reg-link" href="${safeUrl}" target="_blank" rel="noopener">${entry.linkText || safeUrl}</a>`;
     }
 
     const display =
-      entry.format === 'rule'   ? formatRuleText(value)
+      entry.format === 'join'     ? value.map((v) => escapeHtml(v)).join('<br>')
+      : entry.format === 'rule'   ? formatRuleText(value)
       : entry.format === 'bullet' ? formatBulletsWithIndents(value)
       : entry.format === 'date'   ? formatDate(value)
       :                             escapeHtml(value);
@@ -842,31 +920,67 @@
   // Summary card block — driven by SUMMARY_SCHEMA so it stays in sync
   // with the rules tab automatically
   function buildSummaryBlock(title, fieldKey, features) {
-    const items = features
-      .map((f) => ({
-        name: getVal(f.properties, 'Full_name') || getVal(f.properties, 'Full_Name'),
-        val:  getVal(f.properties, fieldKey),
-      }))
-      .filter((i) => i.val);
+    const grouped = {
+      prohibited: new Map(),
+      allowed: new Map(),
+      allowed_limits: new Map(),
+      other: new Map(),
+    };
 
-    if (!items.length) return '';
+    features.forEach((f, index) => {
+      const val = getVal(f.properties, fieldKey);
+      if (!val) return;
+      normalizeRuleSegments(val)
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .forEach((line) => {
+          const bucket = classifyRuleLine(line);
+          const key = line.toLowerCase();
+          if (!grouped[bucket].has(key)) grouped[bucket].set(key, { text: line, sources: new Set() });
+          grouped[bucket].get(key).sources.add(index + 1);
+        });
+    });
+
+    const hasAny = SUMMARY_RULE_ORDER.some((k) => grouped[k].size);
+    if (!hasAny) return '';
 
     return `
       <div class="summary-field-block">
         <div class="summary-section-title">${title}</div>
-        ${items.map((item) => `
-          <div class="area-label">${escapeHtml(item.name)}:</div>
-          <div class="rule-rich-text">${formatRuleText(item.val)}</div>
-        `).join('')}
+        ${SUMMARY_RULE_ORDER.map((bucket) => {
+          if (!grouped[bucket].size) return '';
+          return `<div class="summary-category">
+            <div class="summary-category__title">${SUMMARY_RULE_LABELS[bucket]}</div>
+            <div class="summary-category__list">
+              ${Array.from(grouped[bucket].values()).map((item) => `
+                <div class="summary-rule-item">
+                  <span class="summary-rule-item__text">${escapeHtml(item.text)}</span>
+                  <span class="summary-rule-item__sources">
+                    ${Array.from(item.sources).sort((a, b) => a - b).map((sourceNum) => `
+                      <span class="source-chip" style="--chip-color:${SOURCE_CHIP_COLORS[(sourceNum - 1) % SOURCE_CHIP_COLORS.length]}" title="Source area ${sourceNum}">
+                        <span class="sr-only">Source area ${sourceNum}</span>${sourceNum}
+                      </span>
+                    `).join('')}
+                  </span>
+                </div>`).join('')}
+            </div>
+          </div>`;
+        }).join('')}
       </div>`;
   }
 
   // Build just the collapsible panel content — the trigger button now lives
   // in the mmpopup header so it's always visible regardless of scroll position.
   function buildSummaryPanel(features) {
-    const areaListHtml = features.map((f) => {
+    const areaListHtml = features.map((f, index) => {
       const name = getVal(f.properties, 'Full_name') || getVal(f.properties, 'Full_Name') || 'Unknown Area';
-      return `<li class="summary-area-name">${escapeHtml(name)}</li>`;
+      return `<li class="summary-area-name">
+        <span class="source-chip" style="--chip-color:${SOURCE_CHIP_COLORS[index % SOURCE_CHIP_COLORS.length]}" title="Source area ${escapeHtml(name)}">
+          <span class="sr-only">Source area </span>${index + 1}
+        </span>
+        ${escapeHtml(name)}
+      </li>`;
     }).join('');
 
     return `
@@ -885,11 +999,13 @@
 
   function buildCarousel(images, areaName) {
     if (!images.length) return '';
-    const encodedImages = images.map((u) => encodeURIComponent(u)).join('|');
-    const multi = images.length > 1;
+    const safeImages = images.map((url) => getSafeUrl(url)).filter(Boolean);
+    if (!safeImages.length) return '';
+    const encodedImages = safeImages.map((u) => encodeURIComponent(u)).join('|');
+    const multi = safeImages.length > 1;
     const dots = multi
       ? `<div class="mmcard__image-dots" aria-hidden="true">
-           ${images.map((_, i) =>
+           ${safeImages.map((_, i) =>
              `<span class="mmcard__image-dot${i === 0 ? ' is-active' : ''}"></span>`
            ).join('')}
          </div>`
@@ -912,7 +1028,7 @@
       : '';
     return `
       <div class="mmcard__image-wrap" data-carousel-index="0">
-        <img class="mmcard__image" src="${images[0]}" alt="${escapeHtml(areaName)}" loading="lazy">
+        <img class="mmcard__image" src="${safeImages[0]}" alt="${escapeHtml(areaName)}" loading="lazy">
         ${navButtons}
         ${dots}
       </div>`;
@@ -921,11 +1037,7 @@
   function buildAreaCard(feature, uid) {
     const props    = feature.properties;
     const name     = getVal(props, 'Full_name') || getVal(props, 'Full_Name') || 'Unknown Area';
-    const images   = [
-      getVal(props, 'Area_Image_URL_1'),
-      getVal(props, 'Area_Image_URL_2'),
-      getVal(props, 'Area_Image_URL_3'),
-    ].filter(Boolean).map((url) => String(url).trim());
+    const images   = collectImageUrls(props);
 
     return `
       <div class="area-section mmcard">
@@ -1024,9 +1136,7 @@
   // ── 15. INFO PANEL — OPEN / CLOSE ────────────────────────────
   function openInfoPanel(latlng, features, options = {}) {
     activeLastLatlng  = latlng || null;
-    if (options.source !== 'menu') {
-      activeLastBounds = null;
-    }
+    activeLastBounds = getBoundsForFeatures(features);
 
     const isMulti   = features.length > 1;
     const areaName  = getVal(features[0].properties, 'Full_name') ||
@@ -1089,6 +1199,16 @@
     if (options.source === 'map' && latlng) {
       clearAccordionSelectionHighlight();
       updateClickMarker(latlng);
+      if (!isMobileView() && activeLastBounds) {
+        const leftWidth = getLeftOverlayWidth();
+        map.fitBounds(activeLastBounds, {
+          animate: true,
+          duration: 0.7,
+          paddingTopLeft: [Math.max(24, leftWidth + 24), 24],
+          paddingBottomRight: [24, 24],
+          maxZoom: 14,
+        });
+      }
     }
   }
 
@@ -1317,6 +1437,7 @@
 
   function filterSidebar() {
     const term = normalizeHawaiianText(areaSearchEl?.value || '');
+    let totalMatches = 0;
 
     document.querySelectorAll('.island-group').forEach((group) => {
       const islandLabel = group.querySelector('.header-left span')?.textContent || '';
@@ -1326,7 +1447,10 @@
       group.querySelectorAll('.area-item').forEach((item) => {
         const matches = term === '' || islandMatch || normalizeHawaiianText(item.textContent).includes(term);
         item.style.display = matches ? '' : 'none';
-        if (matches) hasMatch = true;
+        if (matches) {
+          hasMatch = true;
+          totalMatches += 1;
+        }
       });
 
       const list   = group.querySelector('.area-list');
@@ -1346,6 +1470,17 @@
         header?.setAttribute('aria-expanded', 'false');
       }
     });
+
+    let notice = document.getElementById('search-no-results');
+    if (!notice) {
+      notice = document.createElement('div');
+      notice.id = 'search-no-results';
+      notice.className = 'loading-notice';
+      notice.textContent = 'No matching areas found';
+      notice.hidden = true;
+      islandListEl?.appendChild(notice);
+    }
+    notice.hidden = !(term !== '' && totalMatches === 0);
   }
 
 
