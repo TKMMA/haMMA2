@@ -900,6 +900,7 @@
   // ── 13. MAP SELECTION / CLEAR ────────────────────────────────
   function clearMapSelection(options = {}) {
     if (_flyTimer) { clearTimeout(_flyTimer); _flyTimer = null; }
+    map.stop();
     activeLastBounds = null;
     const hadSelection = Boolean(
       activeSelectionMarker ||
@@ -1663,6 +1664,16 @@
                     activeLastBounds = null;
                   }
                   openInfoPanel(latlng, hits, { source: 'map' });
+                  if (!isMobileView() && activeLastBounds) {
+                    const leftWidth = getLeftOverlayWidth();
+                    map.fitBounds(activeLastBounds, {
+                      animate: true,
+                      duration: 0.7,
+                      paddingTopLeft: [Math.max(24, leftWidth + 24), 24],
+                      paddingBottomRight: [24, 24],
+                      maxZoom: 14,
+                    });
+                  }
                 });
               }
 
