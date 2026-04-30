@@ -1048,13 +1048,14 @@
 
   function buildCarousel(images, areaName) {
     if (!images.length) return '';
+    const carouselImages = images;
     const encodedImages = images
       .map((img) => encodeURIComponent(JSON.stringify(img)))
       .join('|');
-    const multi = images.length > 1;
+    const multi = carouselImages.length > 1;
     const dots = multi
       ? `<div class="mmcard__image-dots" aria-hidden="true">
-           ${safeImages.map((_, i) =>
+           ${carouselImages.map((_, i) =>
              `<span class="mmcard__image-dot${i === 0 ? ' is-active' : ''}"></span>`
            ).join('')}
          </div>`
