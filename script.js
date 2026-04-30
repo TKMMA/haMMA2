@@ -334,6 +334,43 @@
   }
 
 
+  function buildSummarySources(features) {
+    return features.map((feature, index) => ({
+      id: index + 1,
+      feature,
+      name: getFeatureName(feature.properties),
+      className: `source-chip--${(index % 8) + 1}`,
+    }));
+  }
+
+  function renderSourceChip(source) {
+    return `<span class="source-chip ${source.className}" title="Source ${source.id}: ${escapeHtml(source.name)}" aria-label="Source ${source.id}: ${escapeHtml(source.name)}">
+      <span class="sr-only">Source </span>${source.id}
+    </span>`;
+  }
+
+  function renderSourceChips(sources) {
+    return sources.map((s) => renderSourceChip(s)).join('');
+  }
+
+
+  function getAreaImages(feature) {
+    const props = feature?.properties || {};
+    const areaName = getFeatureName(props) || 'Managed area';
+    // TODO: Replace/augment this placeholder field mapping with ArcGIS
+    // attachment retrieval later. Keep returning this same normalized shape
+    // so carousel/card renderers do not need to change.
+    return ['Area_Image_URL_1', 'Area_Image_URL_2', 'Area_Image_URL_3']
+      .map((key) => getSafeUrl(getVal(props, key)))
+      .filter(Boolean)
+      .map((url) => ({
+        url,
+        alt: areaName,
+        caption: '',
+      }));
+  }
+
+
   // ── 5. MAP INITIALISATION ────────────────────────────────────
   const map = L.map('map', { zoomControl: false }).setView([20.4, -157.4], 7);
 
@@ -1007,32 +1044,17 @@
 
   function buildCombinedRulesSummary(features) {
     const sources = buildSummarySources(features);
-    const categories = SUMMARY_SCHEMA.map((schemaRow) => {
-      const grouped = {
-        prohibited: new Map(),
-        allowed: new Map(),
-        limited: new Map(),
-        other: new Map(),
-      };
-      sources.forEach((source) => {
-        const val = getVal(source.feature.properties, schemaRow.fieldKey);
-        if (!val) return;
-        parseRuleField(val).forEach((parsedLine) => {
-          const key = normalizeRuleForMerge(parsedLine.text);
-          if (!grouped[parsedLine.status].has(key)) {
-            grouped[parsedLine.status].set(key, { text: parsedLine.text, sources: [] });
-          }
-          const item = grouped[parsedLine.status].get(key);
-          if (!item.sources.some((s) => s.id === source.id)) item.sources.push(source);
-        });
-      });
-      const groups = SUMMARY_GROUP_ORDER.map((groupKey) => ({
-        key: groupKey,
-        title: SUMMARY_GROUP_LABELS[groupKey],
-        rules: Array.from(grouped[groupKey].values()),
-      })).filter((group) => group.rules.length > 0 || group.key !== 'other');
-      return { title: schemaRow.title, groups };
-    }).filter((category) => category.groups.some((group) => group.rules.length));
+    const categories = SUMMARY_SCHEMA
+      .map((schemaRow) => {
+        const entries = sources
+          .map((source) => ({
+            source,
+            value: getVal(source.feature.properties, schemaRow.fieldKey),
+          }))
+          .filter((e) => e.value);
+        return { title: schemaRow.title, entries };
+      })
+      .filter((category) => category.entries.length > 0);
     return { sources, categories };
   }
 
@@ -1053,17 +1075,11 @@
               ${summary.categories.map((category) => `
                 <div class="summary-field-block">
                   <div class="summary-section-title">${escapeHtml(category.title)}</div>
-                  ${category.groups.map((group) => group.rules.length ? `
-                    <div class="summary-category summary-rule-group">
-                      <div class="summary-category__title">${group.title}</div>
-                      <div class="summary-category__list summary-rule-list">
-                        ${group.rules.map((rule) => `
-                          <div class="summary-rule-item">
-                            <div class="summary-rule-item__text">${formatRuleBody(stripCalloutPrefix(rule.text))}</div>
-                            <span class="summary-rule-item__sources summary-rule-source-chips">${renderSourceChips(rule.sources)}</span>
-                          </div>`).join('')}
-                      </div>
-                    </div>` : '').join('')}
+                  ${category.entries.map((entry) => `
+                    <div class="summary-rule-entry">
+                      <div class="summary-rule-entry__chip">${renderSourceChip(entry.source)}</div>
+                      <div class="summary-rule-entry__text">${formatRuleText(entry.value)}</div>
+                    </div>`).join('')}
                 </div>`).join('')}
             </div>` : `<p class="summary-empty">No combined rule text is available for these selected areas.</p>`}
           </div>
