@@ -291,11 +291,20 @@
       .toLowerCase();
   }
 
-  function collectImageUrls(props) {
+  function getAreaImages(feature) {
+    const props = feature?.properties || {};
+    const areaName = getVal(props, 'Full_name') || getVal(props, 'Full_Name') || 'Managed area';
+    // TODO: Replace/augment this placeholder field mapping with ArcGIS
+    // attachment retrieval later. Keep returning this same normalized shape
+    // so carousel/card renderers do not need to change.
     return ['Area_Image_URL_1', 'Area_Image_URL_2', 'Area_Image_URL_3']
-      .map((key) => getVal(props, key))
+      .map((key) => getSafeUrl(getVal(props, key)))
       .filter(Boolean)
-      .map((url) => String(url).trim());
+      .map((url) => ({
+        url,
+        alt: areaName,
+        caption: '',
+      }));
   }
 
 
@@ -1035,10 +1044,10 @@
 
   function buildCarousel(images, areaName) {
     if (!images.length) return '';
-    const safeImages = images.map((url) => getSafeUrl(url)).filter(Boolean);
-    if (!safeImages.length) return '';
-    const encodedImages = safeImages.map((u) => encodeURIComponent(u)).join('|');
-    const multi = safeImages.length > 1;
+    const encodedImages = images
+      .map((img) => encodeURIComponent(JSON.stringify(img)))
+      .join('|');
+    const multi = images.length > 1;
     const dots = multi
       ? `<div class="mmcard__image-dots" aria-hidden="true">
            ${safeImages.map((_, i) =>
@@ -1064,7 +1073,8 @@
       : '';
     return `
       <div class="mmcard__image-wrap" data-carousel-index="0">
-        <img class="mmcard__image" src="${safeImages[0]}" alt="${escapeHtml(areaName)}" loading="lazy">
+        <img class="mmcard__image" src="${images[0].url}" alt="${escapeHtml(images[0].alt || areaName)}" loading="lazy">
+        <div class="mmcard__image-fallback" hidden>Image unavailable</div>
         ${navButtons}
         ${dots}
       </div>`;
@@ -1073,7 +1083,7 @@
   function buildAreaCard(feature, uid) {
     const props    = feature.properties;
     const name     = getVal(props, 'Full_name') || getVal(props, 'Full_Name') || 'Unknown Area';
-    const images   = collectImageUrls(props);
+    const images   = getAreaImages(feature);
 
     return `
       <div class="area-section mmcard">
@@ -1745,17 +1755,25 @@
       const img  = wrap?.querySelector('.mmcard__image');
       if (!wrap || !img) return;
 
-      const urls = (navBtn.dataset.images || '')
+      const images = (navBtn.dataset.images || '')
         .split('|')
         .filter(Boolean)
-        .map(decodeURIComponent);
-      if (urls.length < 2) return;
+        .map((encoded) => {
+          try { return JSON.parse(decodeURIComponent(encoded)); }
+          catch (_err) { return null; }
+        })
+        .filter((img) => img?.url);
+      if (images.length < 2) return;
 
       const direction = Number(navBtn.dataset.direction || 1);
       const cur  = Number(wrap.dataset.carouselIndex || 0);
-      const next = (cur + direction + urls.length) % urls.length;
+      const next = (cur + direction + images.length) % images.length;
       wrap.dataset.carouselIndex = String(next);
-      img.src = urls[next];
+      img.src = images[next].url;
+      img.alt = images[next].alt || 'Area image';
+      wrap.classList.remove('is-image-failed');
+      const fallback = wrap.querySelector('.mmcard__image-fallback');
+      if (fallback) fallback.hidden = true;
 
       // Sync dot indicators
       wrap.querySelectorAll('.mmcard__image-dot').forEach((dot, i) => {
@@ -1763,6 +1781,17 @@
       });
     }
   });
+
+  infoContentEl?.addEventListener('error', (e) => {
+    const imageEl = e.target.closest('.mmcard__image');
+    if (!imageEl) return;
+    const wrap = imageEl.closest('.mmcard__image-wrap');
+    if (!wrap) return;
+    imageEl.style.display = 'none';
+    wrap.classList.add('is-image-failed');
+    const fallback = wrap.querySelector('.mmcard__image-fallback');
+    if (fallback) fallback.hidden = false;
+  }, true);
 
   // Map events
   map.on('click',     () => { if (!isMobileView()) clearMapSelection({ fromClick: true }); });
