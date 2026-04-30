@@ -244,6 +244,12 @@
     }).join('');
   }
 
+  function stripCalloutPrefix(text) {
+    return String(text)
+      .replace(/^(?:[-•]\s*)?(?:Prohibited|Allowed[^:]*)[^:]*:\s*/i, '')
+      .trim();
+  }
+
   function buildSummarySources(features) {
     return features.map((feature, index) => ({
       id: index + 1,
@@ -1053,7 +1059,7 @@
                       <div class="summary-category__list summary-rule-list">
                         ${group.rules.map((rule) => `
                           <div class="summary-rule-item">
-                            <div class="summary-rule-item__text">${formatRuleText(rule.text)}</div>
+                            <div class="summary-rule-item__text">${formatRuleBody(stripCalloutPrefix(rule.text))}</div>
                             <span class="summary-rule-item__sources summary-rule-source-chips">${renderSourceChips(rule.sources)}</span>
                           </div>`).join('')}
                       </div>
