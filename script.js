@@ -651,6 +651,10 @@
   function onBannerDragStart(e, panel) {
     if (!isMobileView() || !paneStageEl) return;
     if (_drag) return;
+    // Don't intercept taps on interactive children (e.g. the back button).
+    // If the touch originated on a button or anchor, let the click fire.
+    const firstTouch = (e.touches || [e])[0];
+    if (firstTouch?.target?.closest('button, a')) return;
     e.preventDefault();
 
     const touch = (e.touches || [e])[0];
