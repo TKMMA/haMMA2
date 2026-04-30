@@ -408,6 +408,43 @@
   }
 
 
+  function buildSummarySources(features) {
+    return features.map((feature, index) => ({
+      id: index + 1,
+      feature,
+      name: getFeatureName(feature.properties),
+      className: `source-chip--${(index % 8) + 1}`,
+    }));
+  }
+
+  function renderSourceChip(source) {
+    return `<span class="source-chip ${source.className}" title="Source ${source.id}: ${escapeHtml(source.name)}" aria-label="Source ${source.id}: ${escapeHtml(source.name)}">
+      <span class="sr-only">Source </span>${source.id}
+    </span>`;
+  }
+
+  function renderSourceChips(sources) {
+    return sources.map((s) => renderSourceChip(s)).join('');
+  }
+
+
+  function getAreaImages(feature) {
+    const props = feature?.properties || {};
+    const areaName = getFeatureName(props) || 'Managed area';
+    // TODO: Replace/augment this placeholder field mapping with ArcGIS
+    // attachment retrieval later. Keep returning this same normalized shape
+    // so carousel/card renderers do not need to change.
+    return ['Area_Image_URL_1', 'Area_Image_URL_2', 'Area_Image_URL_3']
+      .map((key) => getSafeUrl(getVal(props, key)))
+      .filter(Boolean)
+      .map((url) => ({
+        url,
+        alt: areaName,
+        caption: '',
+      }));
+  }
+
+
   // ── 5. MAP INITIALISATION ────────────────────────────────────
   const map = L.map('map', { zoomControl: false }).setView([20.4, -157.4], 7);
 

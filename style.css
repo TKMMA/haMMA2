@@ -1338,6 +1338,9 @@ a {
   }
 
   .info-mobile-header__back {
+    position: relative;
+    z-index: 10;
+    touch-action: manipulation;
     flex-shrink: 0;
     border: none;
     background: transparent;
