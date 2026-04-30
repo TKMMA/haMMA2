@@ -82,6 +82,14 @@
     laws: [
       { key: 'HAR_Name',  label: 'HAR Name' },
       { key: 'HAR_Link',  label: 'HAR Document', format: 'link', linkText: 'View HAR PDF ›' },
+      { key: 'HRS_Name',  label: 'HRS Name' },
+      { key: 'HRS_Link',  label: 'HRS Document', format: 'link', linkText: 'View HRS document ›' },
+      { key: 'Law_Other_Name_1', urlKey: 'Law_Other_URL_1', label: 'Other Law Reference', format: 'textLink', linkText: 'View reference ›' },
+      { key: 'Law_Other_Name_2', urlKey: 'Law_Other_URL_2', label: 'Other Law Reference', format: 'textLink', linkText: 'View reference ›' },
+      { key: 'State_Fishing_Regs_Text', urlKey: 'State_Fishing_Regs_URL', label: 'Statewide Fishing Regulations', format: 'textLink', linkText: 'View statewide regulations ›' },
+      { key: 'Rules_Also_Text', urlKey: 'Rules_Also_URL', label: 'Additional Rules', format: 'textLink', linkText: 'View additional rules ›' },
+      { key: 'Mgmt_Auth', label: 'Management Authority', format: 'bullet' },
+      { key: 'Enf_Auth', label: 'Enforcement Authority', format: 'bullet' },
       { key: 'Penalties', label: 'Penalties',    format: 'bullet' },
     ],
   };
@@ -92,6 +100,13 @@
     title:    f.label,
     fieldKey: f.key,
   }));
+  const SUMMARY_GROUP_ORDER = ['prohibited', 'allowed', 'limited', 'other'];
+  const SUMMARY_GROUP_LABELS = {
+    prohibited: 'Prohibited',
+    allowed: 'Allowed',
+    limited: 'Allowed with limits',
+    other: 'Other / notes',
+  };
 
 
 
@@ -101,6 +116,7 @@
   let activeAccordionLayer   = null;
   let activeHoverLayer       = null;
   let activeLastLatlng       = null;  // last latlng used to open the info panel
+  let lastSelectionSource    = null;  // 'menu' | 'map' | null
   let _flyTimer              = null;  // pending mobile fly-to timer
 
 
@@ -124,6 +140,10 @@
     return val === 'N/A' || val === '' || val === null ? null : val;
   }
 
+  function getFeatureName(props) {
+    return (getVal(props, 'Full_Name') || getVal(props, 'Full_name') || 'Unknown Area').trim();
+  }
+
   // Safely escape user-/API-supplied text before injecting into HTML
   function escapeHtml(value) {
     return String(value)
@@ -138,8 +158,20 @@
     if (!dateVal || dateVal === 'N/A') return 'N/A';
     const d = new Date(dateVal);
     return Number.isNaN(d.getTime())
-      ? dateVal
-      : `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
+      ? escapeHtml(dateVal)
+      : `${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}/${d.getUTCFullYear()}`;
+  }
+
+  function getSafeUrl(value) {
+    if (!value || value === 'N/A') return null;
+    const raw = String(value).trim();
+    if (!raw) return null;
+    try {
+      const parsed = new URL(raw, window.location.href);
+      return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? parsed.href : null;
+    } catch (_err) {
+      return null;
+    }
   }
 
 
@@ -165,7 +197,7 @@
       .map((l) => `
         <div class="mm-bullet-container">
           <span class="mm-bullet-point">•</span>
-          <span class="mm-bullet-text">${l.replace(/^[•●○◦*-]\s+/, '').trim()}</span>
+          <span class="mm-bullet-text">${escapeHtml(l.replace(/^[•●○◦*-]\s+/, '').trim())}</span>
         </div>`)
       .join('');
   }
@@ -210,6 +242,89 @@
           ${bodyHtml}
         </div>`;
     }).join('');
+  }
+
+  function buildSummarySources(features) {
+    return features.map((feature, index) => ({
+      id: index + 1,
+      feature,
+      name: getFeatureName(feature.properties),
+      className: `source-chip--${(index % 8) + 1}`,
+    }));
+  }
+
+  function renderSourceChip(source) {
+    return `<span class="source-chip ${source.className}" title="Source ${source.id}: ${escapeHtml(source.name)}" aria-label="Source ${source.id}: ${escapeHtml(source.name)}">
+      <span class="sr-only">Source </span>${source.id}
+    </span>`;
+  }
+
+  function renderSourceChips(sources) {
+    return sources.map((s) => renderSourceChip(s)).join('');
+  }
+
+  function splitRuleLines(text) {
+    if (!text || text === 'N/A') return [];
+    const calloutStart = /^(?:[-•]\s*)?(Prohibited[^:]*:|Allowed[^:]*:)/i;
+    const lines = normalizeRuleSegments(text)
+      .replace(/\r\n?/g, '\n')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const blocks = [];
+    let current = [];
+    lines.forEach((line) => {
+      if (calloutStart.test(line)) {
+        if (current.length) blocks.push(current.join('\n'));
+        current = [line];
+      } else if (current.length) {
+        current.push(line);
+      } else {
+        blocks.push(line);
+      }
+    });
+    if (current.length) blocks.push(current.join('\n'));
+    return blocks;
+  }
+
+  function classifyRuleLine(line) {
+    const value = String(line).trim();
+    const lower = value.toLowerCase();
+    if (/^prohibited\b/.test(lower)) return 'prohibited';
+    if (/^allowed\b.*\b(limit|limits|limitation|limitations)\b/.test(lower) || /^allowed\s+with\s+limits?\b/.test(lower)) return 'limited';
+    if (/^allowed\b/.test(lower)) return 'allowed';
+    return 'other';
+  }
+
+  function parseRuleField(text) {
+    return splitRuleLines(text).map((block) => ({
+      text: block,
+      status: classifyRuleLine(block.split('\n')[0] || block),
+    }));
+  }
+
+  function normalizeRuleForMerge(text) {
+    return String(text)
+      .replace(/\s+/g, ' ')
+      .replace(/[.]+$/g, '.')
+      .trim()
+      .toLowerCase();
+  }
+
+  function getAreaImages(feature) {
+    const props = feature?.properties || {};
+    const areaName = getFeatureName(props) || 'Managed area';
+    // TODO: Replace/augment this placeholder field mapping with ArcGIS
+    // attachment retrieval later. Keep returning this same normalized shape
+    // so carousel/card renderers do not need to change.
+    return ['Area_Image_URL_1', 'Area_Image_URL_2', 'Area_Image_URL_3']
+      .map((key) => getSafeUrl(getVal(props, key)))
+      .filter(Boolean)
+      .map((url) => ({
+        url,
+        alt: areaName,
+        caption: '',
+      }));
   }
 
 
@@ -355,7 +470,9 @@
     info.classList.toggle('active',       isInfoView);
 
     // ── Schedule fly-to after sheet settles ─────────────────────
-    if (isInfoView && nextState !== 'hidden' && !opts.skipRecentre) {
+    const shouldRecentreInfoHalf = isInfoView && nextState === 'info-half' && !opts.skipRecentre;
+    const returningFromFullToHalf = prevState === 'info-full' && nextState === 'info-half';
+    if ((shouldRecentreInfoHalf || returningFromFullToHalf) && lastSelectionSource === 'menu') {
       scheduleMobileFly(activeLastBounds, activeLastLatlng);
     }
   }
@@ -416,6 +533,7 @@
 
   function onBannerDragStart(e, panel) {
     if (!isMobileView() || !paneStageEl) return;
+    if (_drag) return;
     e.preventDefault();
 
     const touch = (e.touches || [e])[0];
@@ -487,7 +605,7 @@
     applyMobileState(nearest);
   }
 
-  function wireSheetBannerDrag(zoneId, panel) {
+  function wireSheetBannerDrag(zoneId, panel, opts = {}) {
     const zone = document.getElementById(zoneId);
     if (!zone) return;
     zone.addEventListener('touchstart',  (e) => onBannerDragStart(e, panel), { passive: false });
@@ -496,7 +614,7 @@
     zone.addEventListener('touchcancel', onBannerDragEnd,   { passive: false });
 
     // Tap on the info tab when collapsed → restore to info-half
-    if (panel === 'info') {
+    if (panel === 'info' && opts.enableRestoreTap) {
       zone.addEventListener('click', () => {
         if (mobileState === 'hidden' && paneStageEl?.classList.contains('is-info-view')) {
           applyMobileState('info-half');
@@ -558,6 +676,31 @@
     return map.getBoundsZoom(bounds, false, L.point(getLeftOverlayWidth() + 30, 30));
   }
 
+  function getMobileVisibleMapStrip() {
+    const mapRect = map.getContainer().getBoundingClientRect();
+    const stageRect = paneStageEl?.getBoundingClientRect();
+    const sheetTop = stageRect ? Math.max(mapRect.top, stageRect.top) : (mapRect.top + mapRect.height * 0.5);
+    const sidePadding = 16;
+    const topPadding = 10;
+    const bottomPadding = 8;
+    const left = sidePadding;
+    const right = Math.max(left + 40, mapRect.width - sidePadding);
+    const top = topPadding;
+    const bottom = Math.max(top + 24, (sheetTop - mapRect.top) - bottomPadding);
+    const width = Math.max(40, right - left);
+    const height = Math.max(24, bottom - top);
+    return {
+      left,
+      right,
+      top,
+      bottom,
+      width,
+      height,
+      centerX: left + (width / 2),
+      centerY: top + (height / 2),
+    };
+  }
+
   function featureFitsVisibleArea(bounds, padding = 30) {
     const rect = getVisibleMapRect(padding);
     const nw   = map.latLngToContainerPoint(bounds.getNorthWest());
@@ -606,35 +749,24 @@
 
     const screenW = map.getSize().x;
     const screenH = map.getSize().y;
-
-    // ── Where on screen do we want the polygon to land? ───────────
-    // Centre of the visible strip = above the sheet top, below the brand panel.
-    const SHEET_TOP_FRACTION = {
-      'hidden':    0.92,
-      'list-open': 0.50,
-      'list-full': 0.08,
-      'info-half': 0.50,
-      'info-full': 0.08,
-    };
-    const sheetTopY = screenH * (SHEET_TOP_FRACTION[mobileState] ?? 0.50);
-    // Brand panel is inside the sheet on mobile, so getBoundingClientRect()
-    // is unreliable while the sheet is translated. Use a fixed offset:
-    // brand panel = 58px (--sheet-banner-h) + 10px top margin = 68px.
-    const brandBot  = 68;
-    const stripTop  = brandBot + 8;
-    const stripCenterY = (stripTop + sheetTopY) / 2;
+    const strip = getMobileVisibleMapStrip();
+    if (!strip) return;
+    const stripCenterY = strip.centerY;
     const stripCenterX = screenW / 2;
 
     // ── Pick a zoom that fits the polygon in the visible strip ────
     let targetZoom = map.getZoom();
     if (bounds) {
-      const stripH = sheetTopY - stripTop;
-      const stripW = screenW - 40; // 20px side padding
+      if (mobileState === 'info-full' && strip.height < 120) {
+        return;
+      }
+      const stripH = strip.height;
+      const stripW = strip.width;
       // Use a synthetic point as padding to fit-zoom into our strip
       targetZoom = map.getBoundsZoom(
         bounds,
         false,
-        L.point(Math.max(40, screenW - stripW), Math.max(40, screenH - stripH)),
+        L.point(Math.max(32, screenW - stripW), Math.max(32, screenH - stripH)),
       );
       // Clamp to map's zoom range (imagery has no detail past ~17–18)
       const maxZ = map.getMaxZoom?.() ?? 18;
@@ -665,6 +797,17 @@
       _flyTimer = null;
       flyToMobileVisible(bounds, latlng);
     }, delay);
+  }
+
+  function getBoundsForFeatures(features) {
+    if (!features?.length) return null;
+    try {
+      const fc = { type: 'FeatureCollection', features };
+      const bounds = L.geoJSON(fc).getBounds();
+      return bounds?.isValid?.() ? bounds : null;
+    } catch (_err) {
+      return null;
+    }
   }
 
   // Point-in-polygon using ray casting
@@ -774,7 +917,9 @@
   // ── 13. MAP SELECTION / CLEAR ────────────────────────────────
   function clearMapSelection(options = {}) {
     if (_flyTimer) { clearTimeout(_flyTimer); _flyTimer = null; }
+    map.stop();
     activeLastBounds = null;
+    lastSelectionSource = null;
     const hadSelection = Boolean(
       activeSelectionMarker ||
       activeAccordionLayer  ||
@@ -809,18 +954,33 @@
   function renderSchemaField(entry, props) {
     // Resolve the value — 'join' format merges multiple keys
     const value = entry.format === 'join'
-      ? (entry.keys || []).map((k) => getVal(props, k)).filter(Boolean).join('<br>')
+      ? (entry.keys || []).map((k) => getVal(props, k)).filter(Boolean)
       : getVal(props, entry.key);
 
     if (!value) return '';
 
     // 'link' format renders as a button-style anchor, no label row needed
     if (entry.format === 'link') {
-      return `<a class="reg-link" href="${escapeHtml(value)}" target="_blank" rel="noopener">${entry.linkText || value}</a>`;
+      const safeUrl = getSafeUrl(value);
+      if (!safeUrl) return '';
+      return `<a class="reg-link" href="${safeUrl}" target="_blank" rel="noopener">${entry.linkText || safeUrl}</a>`;
+    }
+    if (entry.format === 'textLink') {
+      const textVal = getVal(props, entry.key);
+      const safeUrl = getSafeUrl(getVal(props, entry.urlKey));
+      if (!textVal && !safeUrl) return '';
+      const textHtml = textVal
+        ? `<div class="field-block"><div class="field-block__label">${entry.label}</div><div>${escapeHtml(textVal)}</div></div>`
+        : '';
+      const linkHtml = safeUrl
+        ? `<a class="reg-link" href="${safeUrl}" target="_blank" rel="noopener">${entry.linkText || safeUrl}</a>`
+        : '';
+      return `${textHtml}${linkHtml}`;
     }
 
     const display =
-      entry.format === 'rule'   ? formatRuleText(value)
+      entry.format === 'join'     ? value.map((v) => escapeHtml(v)).join('<br>')
+      : entry.format === 'rule'   ? formatRuleText(value)
       : entry.format === 'bullet' ? formatBulletsWithIndents(value)
       : entry.format === 'date'   ? formatDate(value)
       :                             escapeHtml(value);
@@ -839,45 +999,67 @@
       .join('');
   }
 
-  // Summary card block — driven by SUMMARY_SCHEMA so it stays in sync
-  // with the rules tab automatically
-  function buildSummaryBlock(title, fieldKey, features) {
-    const items = features
-      .map((f) => ({
-        name: getVal(f.properties, 'Full_name') || getVal(f.properties, 'Full_Name'),
-        val:  getVal(f.properties, fieldKey),
-      }))
-      .filter((i) => i.val);
-
-    if (!items.length) return '';
-
-    return `
-      <div class="summary-field-block">
-        <div class="summary-section-title">${title}</div>
-        ${items.map((item) => `
-          <div class="area-label">${escapeHtml(item.name)}:</div>
-          <div class="rule-rich-text">${formatRuleText(item.val)}</div>
-        `).join('')}
-      </div>`;
+  function buildCombinedRulesSummary(features) {
+    const sources = buildSummarySources(features);
+    const categories = SUMMARY_SCHEMA.map((schemaRow) => {
+      const grouped = {
+        prohibited: new Map(),
+        allowed: new Map(),
+        limited: new Map(),
+        other: new Map(),
+      };
+      sources.forEach((source) => {
+        const val = getVal(source.feature.properties, schemaRow.fieldKey);
+        if (!val) return;
+        parseRuleField(val).forEach((parsedLine) => {
+          const key = normalizeRuleForMerge(parsedLine.text);
+          if (!grouped[parsedLine.status].has(key)) {
+            grouped[parsedLine.status].set(key, { text: parsedLine.text, sources: [] });
+          }
+          const item = grouped[parsedLine.status].get(key);
+          if (!item.sources.some((s) => s.id === source.id)) item.sources.push(source);
+        });
+      });
+      const groups = SUMMARY_GROUP_ORDER.map((groupKey) => ({
+        key: groupKey,
+        title: SUMMARY_GROUP_LABELS[groupKey],
+        rules: Array.from(grouped[groupKey].values()),
+      })).filter((group) => group.rules.length > 0 || group.key !== 'other');
+      return { title: schemaRow.title, groups };
+    }).filter((category) => category.groups.some((group) => group.rules.length));
+    return { sources, categories };
   }
 
-  // Build just the collapsible panel content — the trigger button now lives
-  // in the mmpopup header so it's always visible regardless of scroll position.
   function buildSummaryPanel(features) {
-    const areaListHtml = features.map((f) => {
-      const name = getVal(f.properties, 'Full_name') || getVal(f.properties, 'Full_Name') || 'Unknown Area';
-      return `<li class="summary-area-name">${escapeHtml(name)}</li>`;
-    }).join('');
-
+    const summary = buildCombinedRulesSummary(features);
+    const hasRules = summary.categories.length > 0;
     return `
       <div class="summary-accordion__panel--inline" hidden>
-        <div class="mmcard mmcard--summary">
-          <div class="mmcard__body">
-            <div class="summary-card-label">Combined Fishing Rules</div>
-            <ul class="summary-area-list">${areaListHtml}</ul>
-            <div class="summary-field-stack">
-              ${SUMMARY_SCHEMA.map((s) => buildSummaryBlock(s.title, s.fieldKey, features)).join('')}
+        <div class="mmcard mmcard--summary overlap-summary-card">
+          <div class="mmcard__body overlap-summary-intro">
+            <div class="summary-card-label">Combined rules summary</div>
+            <p class="summary-explainer">Rules are reorganized by category and status. Source chips indicate which selected area each rule line came from.</p>
+            <div class="summary-source-legend overlap-source-list">
+              <div class="summary-source-legend__label">Areas included:</div>
+              <ul class="summary-area-list">${summary.sources.map((source) => `<li class="summary-area-name overlap-source-item">${renderSourceChip(source)} ${escapeHtml(source.name)}</li>`).join('')}</ul>
             </div>
+            ${hasRules ? `<div class="summary-field-stack">
+              ${summary.categories.map((category) => `
+                <div class="summary-field-block">
+                  <div class="summary-section-title">${escapeHtml(category.title)}</div>
+                  ${category.groups.map((group) => group.rules.length ? `
+                    <div class="summary-category summary-rule-group">
+                      <div class="summary-category__title">${group.title}</div>
+                      <div class="summary-category__list summary-rule-list">
+                        ${group.rules.map((rule) => `
+                          <div class="summary-rule-item">
+                            <div class="summary-rule-item__text">${formatRuleText(rule.text)}</div>
+                            <span class="summary-rule-item__sources summary-rule-source-chips">${renderSourceChips(rule.sources)}</span>
+                          </div>`).join('')}
+                      </div>
+                    </div>` : '').join('')}
+                </div>`).join('')}
+            </div>` : `<p class="summary-empty">No combined rule text is available for these selected areas.</p>`}
           </div>
         </div>
       </div>`;
@@ -885,11 +1067,14 @@
 
   function buildCarousel(images, areaName) {
     if (!images.length) return '';
-    const encodedImages = images.map((u) => encodeURIComponent(u)).join('|');
-    const multi = images.length > 1;
+    const carouselImages = images;
+    const encodedImages = images
+      .map((img) => encodeURIComponent(JSON.stringify(img)))
+      .join('|');
+    const multi = carouselImages.length > 1;
     const dots = multi
       ? `<div class="mmcard__image-dots" aria-hidden="true">
-           ${images.map((_, i) =>
+           ${carouselImages.map((_, i) =>
              `<span class="mmcard__image-dot${i === 0 ? ' is-active' : ''}"></span>`
            ).join('')}
          </div>`
@@ -912,7 +1097,8 @@
       : '';
     return `
       <div class="mmcard__image-wrap" data-carousel-index="0">
-        <img class="mmcard__image" src="${images[0]}" alt="${escapeHtml(areaName)}" loading="lazy">
+        <img class="mmcard__image" src="${images[0].url}" alt="${escapeHtml(images[0].alt || areaName)}" loading="lazy">
+        <div class="mmcard__image-fallback" hidden>Image unavailable</div>
         ${navButtons}
         ${dots}
       </div>`;
@@ -920,12 +1106,8 @@
 
   function buildAreaCard(feature, uid) {
     const props    = feature.properties;
-    const name     = getVal(props, 'Full_name') || getVal(props, 'Full_Name') || 'Unknown Area';
-    const images   = [
-      getVal(props, 'Area_Image_URL_1'),
-      getVal(props, 'Area_Image_URL_2'),
-      getVal(props, 'Area_Image_URL_3'),
-    ].filter(Boolean).map((url) => String(url).trim());
+    const name     = getFeatureName(props);
+    const images   = getAreaImages(feature);
 
     return `
       <div class="area-section mmcard">
@@ -951,6 +1133,58 @@
             ${renderTab('laws', props)}
           </div>
 
+        </div>
+      </div>`;
+  }
+
+  function renderSingleAreaInfoPane(feature) {
+    return `
+      <div class="mmpopup">
+        <div class="mmpopup__scroll">
+          ${buildAreaCard(feature, 'area-0')}
+        </div>
+      </div>`;
+  }
+
+  function renderOverlapHeader(features) {
+    const count = features.length;
+    return `
+      <div class="overlap-context">
+        <h3 class="overlap-context__title">${count} overlapping areas selected</h3>
+        <p class="overlap-context__copy">Review the combined summary first, then use the source cards below for original rule text.</p>
+      </div>`;
+  }
+
+  function renderAreaSpecificSection(features) {
+    return `
+      <section class="overlap-areas area-specific-section" aria-label="Area-specific rules">
+        <h4 class="overlap-areas__title">Area-specific rules</h4>
+        <p class="overlap-areas__copy">These cards preserve the original rules for each selected area.</p>
+        ${features.map((f, i) => buildAreaCard(f, `area-${i}`)).join('')}
+      </section>`;
+  }
+
+  function renderOverlapInfoPane(features) {
+    const count = features.length;
+    return `
+      <div class="mmpopup">
+        <button
+          class="mmpopup__summary-banner"
+          type="button"
+          aria-expanded="false"
+          data-action="toggle-summary"
+          data-area-count="${count}"
+        >
+          <span class="mmpopup__summary-banner__cta">
+            <span class="mmpopup__summary-trigger-label">Combined rules summary</span>
+            <span class="mmpopup__summary-trigger-help">Multiple regulated areas overlap here. Expand this summary to review rules reorganized by activity.</span>
+            <span class="mmpopup__summary-trigger-chevron" aria-hidden="true">▼</span>
+          </span>
+        </button>
+        <div class="mmpopup__scroll">
+          ${renderOverlapHeader(features)}
+          ${buildSummaryPanel(features)}
+          ${renderAreaSpecificSection(features)}
         </div>
       </div>`;
   }
@@ -1007,10 +1241,9 @@
 
     const label = btn.querySelector('.mmpopup__summary-trigger-label');
     if (label) {
-      const areaCount = btn.dataset.areaCount || '';
       label.textContent = expand
-        ? 'Hide combined rules'
-        : `${areaCount} Overlapping Areas — See combined fishing rules`;
+        ? 'Hide combined rules summary'
+        : 'Combined rules summary';
     }
   }
 
@@ -1024,44 +1257,17 @@
   // ── 15. INFO PANEL — OPEN / CLOSE ────────────────────────────
   function openInfoPanel(latlng, features, options = {}) {
     activeLastLatlng  = latlng || null;
-    if (options.source !== 'menu') {
-      activeLastBounds = null;
-    }
+    lastSelectionSource = options.source || null;
+    activeLastBounds = options.source === 'menu'
+      ? getBoundsForFeatures(features)
+      : null;
 
     const isMulti   = features.length > 1;
-    const areaName  = getVal(features[0].properties, 'Full_name') ||
-                      getVal(features[0].properties, 'Full_Name') ||
-                      'Area Info';
-    const count     = features.length;
-    const cardsHtml = features.map((f, i) => buildAreaCard(f, `area-${i}`)).join('');
-
-    // Multi-area: full-width branded action banner — count + CTA in one row.
-    // Single area: no banner needed.
-    const popupHeaderHtml = isMulti
-      ? `<button
-           class="mmpopup__summary-banner"
-           type="button"
-           aria-expanded="false"
-           data-action="toggle-summary"
-           data-area-count="${count}"
-         >
-           <span class="mmpopup__summary-banner__cta">
-             <span class="mmpopup__summary-trigger-label">${count} Overlapping Areas — See combined fishing rules</span>
-             <span class="mmpopup__summary-trigger-chevron" aria-hidden="true">▼</span>
-           </span>
-         </button>`
-      : '';
-
-    const summaryPanelHtml = isMulti ? buildSummaryPanel(features) : '';
-
-    infoContentEl.innerHTML = `
-      <div class="mmpopup">
-        ${popupHeaderHtml}
-        <div class="mmpopup__scroll">
-          ${summaryPanelHtml}
-          ${cardsHtml}
-        </div>
-      </div>`;
+    const areaName  = getFeatureName(features[0].properties) || 'Area Info';
+    const count = features.length;
+    infoContentEl.innerHTML = isMulti
+      ? renderOverlapInfoPane(features)
+      : renderSingleAreaInfoPane(features[0]);
 
     infoContentEl.querySelector('.mmpopup__scroll').scrollTop = 0;
 
@@ -1210,9 +1416,7 @@
     if (!layerGroup) return;
 
     layerGroup.eachLayer((layer) => {
-      const name =
-        getVal(layer.feature.properties, 'Full_Name') ||
-        getVal(layer.feature.properties, 'Full_name');
+      const name = getFeatureName(layer.feature.properties);
       if (name !== areaName) return;
 
       const bounds      = layer.getBounds();
@@ -1290,9 +1494,7 @@
     let matched = null;
     layerGroup.eachLayer((layer) => {
       if (matched) return;
-      const name =
-        getVal(layer.feature.properties, 'Full_Name') ||
-        getVal(layer.feature.properties, 'Full_name');
+      const name = getFeatureName(layer.feature.properties);
       if (name === areaName) matched = layer;
     });
 
@@ -1317,6 +1519,7 @@
 
   function filterSidebar() {
     const term = normalizeHawaiianText(areaSearchEl?.value || '');
+    let totalMatches = 0;
 
     document.querySelectorAll('.island-group').forEach((group) => {
       const islandLabel = group.querySelector('.header-left span')?.textContent || '';
@@ -1326,7 +1529,10 @@
       group.querySelectorAll('.area-item').forEach((item) => {
         const matches = term === '' || islandMatch || normalizeHawaiianText(item.textContent).includes(term);
         item.style.display = matches ? '' : 'none';
-        if (matches) hasMatch = true;
+        if (matches) {
+          hasMatch = true;
+          totalMatches += 1;
+        }
       });
 
       const list   = group.querySelector('.area-list');
@@ -1346,6 +1552,17 @@
         header?.setAttribute('aria-expanded', 'false');
       }
     });
+
+    let notice = document.getElementById('search-no-results');
+    if (!notice) {
+      notice = document.createElement('div');
+      notice.id = 'search-no-results';
+      notice.className = 'loading-notice';
+      notice.textContent = 'No matching areas found';
+      notice.hidden = true;
+      islandListEl?.appendChild(notice);
+    }
+    notice.hidden = !(term !== '' && totalMatches === 0);
   }
 
 
@@ -1388,16 +1605,14 @@
       grouped.forEach(({ name, features }) => {
         // Sort area names once at load time — populateSidebar uses them directly
         const sortedNames = features
-          .map((f) => getVal(f.properties, 'Full_Name') || getVal(f.properties, 'Full_name') || 'Unknown')
+          .map((f) => getFeatureName(f.properties))
           .filter(Boolean)
           .sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
 
         const islandLayer = L.geoJSON({ type: 'FeatureCollection', features }, {
           style: (feature) => {
             const fName = (
-              getVal(feature.properties, 'Full_Name') ||
-              getVal(feature.properties, 'Full_name') ||
-              ''
+              getFeatureName(feature.properties)
             ).toLowerCase();
 
             const match = renderer?.uniqueValueInfos?.find(
@@ -1417,7 +1632,7 @@
             return { weight: 1.2, fillOpacity: 0.3, color: '#005a87' };
           },
 
-          onEachFeature: (_feature, layer) => {
+          onEachFeature: (feature, layer) => {
             // Hover hint on the map (desktop only — mobile has no hover state)
             layer.on('mouseover', () => {
               if (!isMobileView()) applyHoverHighlight(layer);
@@ -1428,6 +1643,11 @@
 
             layer.on('click', (e) => {
               L.DomEvent.stopPropagation(e);
+              map.stop();
+              if (_pendingMoveendHandler) {
+                map.off('moveend', _pendingMoveendHandler);
+                _pendingMoveendHandler = null;
+              }
               // Collect ALL features under this click point across all visible
               // layers, then open the panel once. We use a microtask so that
               // if two overlapping polygons both fire their click handler in
@@ -1444,12 +1664,8 @@
                   if (hits.length === 1) {
                     setActiveAreaItem(
                       getVal(hits[0].properties, 'Island'),
-                      getVal(hits[0].properties, 'Full_Name') || getVal(hits[0].properties, 'Full_name'),
+                      getFeatureName(hits[0].properties),
                     );
-                    if (isMobileView()) {
-                      try { activeLastBounds = L.geoJSON(hits[0]).getBounds(); }
-                      catch (_) { activeLastBounds = null; }
-                    }
                   } else {
                     setActiveAreaItem(null, null);
                     activeLastBounds = null;
@@ -1458,17 +1674,35 @@
                 });
               }
 
+              // Always include the clicked feature first. Some polygons with
+              // complex geometries can fail custom point-in-polygon checks.
+              const clickedId = getVal(feature.properties, 'OBJECTID') ??
+                getVal(feature.properties, 'ObjectId') ??
+                `${getFeatureName(feature.properties)}|${JSON.stringify(feature.geometry?.coordinates?.[0]?.[0] || '')}`;
+              if (!map._haMMA_clickPending.hits.some((f) => {
+                const existingId = getVal(f.properties, 'OBJECTID') ??
+                  getVal(f.properties, 'ObjectId') ??
+                  `${getFeatureName(f.properties)}|${JSON.stringify(f.geometry?.coordinates?.[0]?.[0] || '')}`;
+                return existingId === clickedId;
+              })) {
+                map._haMMA_clickPending.hits.push(feature);
+              }
+
               // Accumulate hits for this click point
               Object.values(allIslandLayers).forEach((group) => {
                 if (!map.hasLayer(group)) return;
                 group.eachLayer((l) => {
                   if (pointInFeatureGeometry(e.latlng, l.feature)) {
                     // Avoid duplicates if this feature was already added
-                    const id = getVal(l.feature.properties, 'Full_name') ||
-                               getVal(l.feature.properties, 'Full_Name');
-                    if (!map._haMMA_clickPending.hits.some((f) =>
-                      (getVal(f.properties, 'Full_name') || getVal(f.properties, 'Full_Name')) === id
-                    )) {
+                    const id = getVal(l.feature.properties, 'OBJECTID') ??
+                      getVal(l.feature.properties, 'ObjectId') ??
+                      `${getFeatureName(l.feature.properties)}|${JSON.stringify(l.feature.geometry?.coordinates?.[0]?.[0] || '')}`;
+                    if (!map._haMMA_clickPending.hits.some((f) => {
+                      const existingId = getVal(f.properties, 'OBJECTID') ??
+                        getVal(f.properties, 'ObjectId') ??
+                        `${getFeatureName(f.properties)}|${JSON.stringify(f.geometry?.coordinates?.[0]?.[0] || '')}`;
+                      return existingId === id;
+                    })) {
                       map._haMMA_clickPending.hits.push(l.feature);
                     }
                   }
@@ -1521,9 +1755,11 @@
   // Wire drag zones to the state machine.
   // List side: the brand panel itself is the drag surface.
   // Info side: the info-mobile-header contains the drag zone.
-  // Wire drag zones — the protruding tab is the touch target for both panels.
+  // Wire both the full banner and protruding tab as drag touch targets.
+  wireSheetBannerDrag('brand-panel', 'list');
   wireSheetBannerDrag('list-drag-zone', 'list');
-  wireSheetBannerDrag('info-drag-zone', 'info');
+  wireSheetBannerDrag('info-banner', 'info');
+  wireSheetBannerDrag('info-drag-zone', 'info', { enableRestoreTap: true });
 
   // Info panel — single delegated listener for all dynamic content:
   // tab buttons, summary accordion toggle, and image carousel
@@ -1549,17 +1785,25 @@
       const img  = wrap?.querySelector('.mmcard__image');
       if (!wrap || !img) return;
 
-      const urls = (navBtn.dataset.images || '')
+      const images = (navBtn.dataset.images || '')
         .split('|')
         .filter(Boolean)
-        .map(decodeURIComponent);
-      if (urls.length < 2) return;
+        .map((encoded) => {
+          try { return JSON.parse(decodeURIComponent(encoded)); }
+          catch (_err) { return null; }
+        })
+        .filter((img) => img?.url);
+      if (images.length < 2) return;
 
       const direction = Number(navBtn.dataset.direction || 1);
       const cur  = Number(wrap.dataset.carouselIndex || 0);
-      const next = (cur + direction + urls.length) % urls.length;
+      const next = (cur + direction + images.length) % images.length;
       wrap.dataset.carouselIndex = String(next);
-      img.src = urls[next];
+      img.src = images[next].url;
+      img.alt = images[next].alt || 'Area image';
+      wrap.classList.remove('is-image-failed');
+      const fallback = wrap.querySelector('.mmcard__image-fallback');
+      if (fallback) fallback.hidden = true;
 
       // Sync dot indicators
       wrap.querySelectorAll('.mmcard__image-dot').forEach((dot, i) => {
@@ -1567,6 +1811,17 @@
       });
     }
   });
+
+  infoContentEl?.addEventListener('error', (e) => {
+    const imageEl = e.target.closest('.mmcard__image');
+    if (!imageEl) return;
+    const wrap = imageEl.closest('.mmcard__image-wrap');
+    if (!wrap) return;
+    imageEl.style.display = 'none';
+    wrap.classList.add('is-image-failed');
+    const fallback = wrap.querySelector('.mmcard__image-fallback');
+    if (fallback) fallback.hidden = false;
+  }, true);
 
   // Map events
   map.on('click',     () => { if (!isMobileView()) clearMapSelection({ fromClick: true }); });
