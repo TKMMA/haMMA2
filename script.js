@@ -533,6 +533,7 @@
 
   function onBannerDragStart(e, panel) {
     if (!isMobileView() || !paneStageEl) return;
+    if (_drag) return;
     e.preventDefault();
 
     const touch = (e.touches || [e])[0];
@@ -604,7 +605,7 @@
     applyMobileState(nearest);
   }
 
-  function wireSheetBannerDrag(zoneId, panel) {
+  function wireSheetBannerDrag(zoneId, panel, opts = {}) {
     const zone = document.getElementById(zoneId);
     if (!zone) return;
     zone.addEventListener('touchstart',  (e) => onBannerDragStart(e, panel), { passive: false });
@@ -613,7 +614,7 @@
     zone.addEventListener('touchcancel', onBannerDragEnd,   { passive: false });
 
     // Tap on the info tab when collapsed → restore to info-half
-    if (panel === 'info') {
+    if (panel === 'info' && opts.enableRestoreTap) {
       zone.addEventListener('click', () => {
         if (mobileState === 'hidden' && paneStageEl?.classList.contains('is-info-view')) {
           applyMobileState('info-half');
@@ -1774,9 +1775,11 @@
   // Wire drag zones to the state machine.
   // List side: the brand panel itself is the drag surface.
   // Info side: the info-mobile-header contains the drag zone.
-  // Wire drag zones — the protruding tab is the touch target for both panels.
+  // Wire both the full banner and protruding tab as drag touch targets.
+  wireSheetBannerDrag('brand-panel', 'list');
   wireSheetBannerDrag('list-drag-zone', 'list');
-  wireSheetBannerDrag('info-drag-zone', 'info');
+  wireSheetBannerDrag('info-banner', 'info');
+  wireSheetBannerDrag('info-drag-zone', 'info', { enableRestoreTap: true });
 
   // Info panel — single delegated listener for all dynamic content:
   // tab buttons, summary accordion toggle, and image carousel
