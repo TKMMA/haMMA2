@@ -1050,7 +1050,7 @@
     const multi = images.length > 1;
     const dots = multi
       ? `<div class="mmcard__image-dots" aria-hidden="true">
-           ${images.map((_, i) =>
+           ${safeImages.map((_, i) =>
              `<span class="mmcard__image-dot${i === 0 ? ' is-active' : ''}"></span>`
            ).join('')}
          </div>`
