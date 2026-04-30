@@ -116,6 +116,7 @@
   let activeAccordionLayer   = null;
   let activeHoverLayer       = null;
   let activeLastLatlng       = null;  // last latlng used to open the info panel
+  let lastSelectionSource    = null;  // 'menu' | 'map' | null
   let _flyTimer              = null;  // pending mobile fly-to timer
 
 
@@ -456,7 +457,7 @@
     // ── Schedule fly-to after sheet settles ─────────────────────
     const shouldRecentreInfoHalf = isInfoView && nextState === 'info-half' && !opts.skipRecentre;
     const returningFromFullToHalf = prevState === 'info-full' && nextState === 'info-half';
-    if (shouldRecentreInfoHalf || returningFromFullToHalf) {
+    if ((shouldRecentreInfoHalf || returningFromFullToHalf) && lastSelectionSource === 'menu') {
       scheduleMobileFly(activeLastBounds, activeLastLatlng);
     }
   }
@@ -902,6 +903,7 @@
     if (_flyTimer) { clearTimeout(_flyTimer); _flyTimer = null; }
     map.stop();
     activeLastBounds = null;
+    lastSelectionSource = null;
     const hadSelection = Boolean(
       activeSelectionMarker ||
       activeAccordionLayer  ||
@@ -1239,7 +1241,10 @@
   // ── 15. INFO PANEL — OPEN / CLOSE ────────────────────────────
   function openInfoPanel(latlng, features, options = {}) {
     activeLastLatlng  = latlng || null;
-    activeLastBounds = getBoundsForFeatures(features);
+    lastSelectionSource = options.source || null;
+    activeLastBounds = options.source === 'menu'
+      ? getBoundsForFeatures(features)
+      : null;
 
     const isMulti   = features.length > 1;
     const areaName  = getFeatureName(features[0].properties) || 'Area Info';
@@ -1655,10 +1660,6 @@
                       getVal(hits[0].properties, 'Island'),
                       getFeatureName(hits[0].properties),
                     );
-                    if (isMobileView()) {
-                      try { activeLastBounds = L.geoJSON(hits[0]).getBounds(); }
-                      catch (_) { activeLastBounds = null; }
-                    }
                   } else {
                     setActiveAreaItem(null, null);
                     activeLastBounds = null;
