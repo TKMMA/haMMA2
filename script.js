@@ -1279,6 +1279,16 @@
     if (options.source === 'map' && latlng) {
       clearAccordionSelectionHighlight();
       updateClickMarker(latlng);
+      if (!isMobileView() && activeLastBounds) {
+        const leftWidth = getLeftOverlayWidth();
+        map.fitBounds(activeLastBounds, {
+          animate: true,
+          duration: 0.7,
+          paddingTopLeft: [Math.max(24, leftWidth + 24), 24],
+          paddingBottomRight: [24, 24],
+          maxZoom: 14,
+        });
+      }
     }
   }
 
@@ -1655,6 +1665,16 @@
                     activeLastBounds = null;
                   }
                   openInfoPanel(latlng, hits, { source: 'map' });
+                  if (!isMobileView() && activeLastBounds) {
+                    const leftWidth = getLeftOverlayWidth();
+                    map.fitBounds(activeLastBounds, {
+                      animate: true,
+                      duration: 0.7,
+                      paddingTopLeft: [Math.max(24, leftWidth + 24), 24],
+                      paddingBottomRight: [24, 24],
+                      maxZoom: 14,
+                    });
+                  }
                 });
               }
 
