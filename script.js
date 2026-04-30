@@ -265,11 +265,26 @@
 
   function splitRuleLines(text) {
     if (!text || text === 'N/A') return [];
-    return normalizeRuleSegments(text)
-      .replace(/([^\n])\s+(?=(?:Prohibited|Allowed(?:\s+with\s+limits|\s+with\s+limitations)?)[^:\n]*:?\s*)/gi, '$1\n')
+    const calloutStart = /^(?:[-•]\s*)?(Prohibited[^:]*:|Allowed[^:]*:)/i;
+    const lines = normalizeRuleSegments(text)
+      .replace(/\r\n?/g, '\n')
       .split('\n')
       .map((line) => line.trim())
       .filter(Boolean);
+    const blocks = [];
+    let current = [];
+    lines.forEach((line) => {
+      if (calloutStart.test(line)) {
+        if (current.length) blocks.push(current.join('\n'));
+        current = [line];
+      } else if (current.length) {
+        current.push(line);
+      } else {
+        blocks.push(line);
+      }
+    });
+    if (current.length) blocks.push(current.join('\n'));
+    return blocks;
   }
 
   function classifyRuleLine(line) {
@@ -282,9 +297,9 @@
   }
 
   function parseRuleField(text) {
-    return splitRuleLines(text).map((line) => ({
-      text: line,
-      status: classifyRuleLine(line),
+    return splitRuleLines(text).map((block) => ({
+      text: block,
+      status: classifyRuleLine(block.split('\n')[0] || block),
     }));
   }
 
@@ -1037,7 +1052,7 @@
                       <div class="summary-category__list summary-rule-list">
                         ${group.rules.map((rule) => `
                           <div class="summary-rule-item">
-                            <span class="summary-rule-item__text">${escapeHtml(rule.text)}</span>
+                            <div class="summary-rule-item__text">${formatRuleText(rule.text)}</div>
                             <span class="summary-rule-item__sources summary-rule-source-chips">${renderSourceChips(rule.sources)}</span>
                           </div>`).join('')}
                       </div>
