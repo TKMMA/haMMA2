@@ -139,6 +139,10 @@
     return val === 'N/A' || val === '' || val === null ? null : val;
   }
 
+  function getFeatureName(props) {
+    return (getVal(props, 'Full_Name') || getVal(props, 'Full_name') || 'Unknown Area').trim();
+  }
+
   // Safely escape user-/API-supplied text before injecting into HTML
   function escapeHtml(value) {
     return String(value)
@@ -243,7 +247,7 @@
     return features.map((feature, index) => ({
       id: index + 1,
       feature,
-      name: getVal(feature.properties, 'Full_name') || getVal(feature.properties, 'Full_Name') || 'Unknown Area',
+      name: getFeatureName(feature.properties),
       className: `source-chip--${(index % 8) + 1}`,
     }));
   }
@@ -293,7 +297,7 @@
 
   function getAreaImages(feature) {
     const props = feature?.properties || {};
-    const areaName = getVal(props, 'Full_name') || getVal(props, 'Full_Name') || 'Managed area';
+    const areaName = getFeatureName(props) || 'Managed area';
     // TODO: Replace/augment this placeholder field mapping with ArcGIS
     // attachment retrieval later. Keep returning this same normalized shape
     // so carousel/card renderers do not need to change.
@@ -1082,7 +1086,7 @@
 
   function buildAreaCard(feature, uid) {
     const props    = feature.properties;
-    const name     = getVal(props, 'Full_name') || getVal(props, 'Full_Name') || 'Unknown Area';
+    const name     = getFeatureName(props);
     const images   = getAreaImages(feature);
 
     return `
@@ -1236,9 +1240,7 @@
     activeLastBounds = getBoundsForFeatures(features);
 
     const isMulti   = features.length > 1;
-    const areaName  = getVal(features[0].properties, 'Full_name') ||
-                      getVal(features[0].properties, 'Full_Name') ||
-                      'Area Info';
+    const areaName  = getFeatureName(features[0].properties) || 'Area Info';
     const count = features.length;
     infoContentEl.innerHTML = isMulti
       ? renderOverlapInfoPane(features)
@@ -1401,9 +1403,7 @@
     if (!layerGroup) return;
 
     layerGroup.eachLayer((layer) => {
-      const name =
-        getVal(layer.feature.properties, 'Full_Name') ||
-        getVal(layer.feature.properties, 'Full_name');
+      const name = getFeatureName(layer.feature.properties);
       if (name !== areaName) return;
 
       const bounds      = layer.getBounds();
@@ -1481,9 +1481,7 @@
     let matched = null;
     layerGroup.eachLayer((layer) => {
       if (matched) return;
-      const name =
-        getVal(layer.feature.properties, 'Full_Name') ||
-        getVal(layer.feature.properties, 'Full_name');
+      const name = getFeatureName(layer.feature.properties);
       if (name === areaName) matched = layer;
     });
 
@@ -1594,16 +1592,14 @@
       grouped.forEach(({ name, features }) => {
         // Sort area names once at load time — populateSidebar uses them directly
         const sortedNames = features
-          .map((f) => getVal(f.properties, 'Full_Name') || getVal(f.properties, 'Full_name') || 'Unknown')
+          .map((f) => getFeatureName(f.properties))
           .filter(Boolean)
           .sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
 
         const islandLayer = L.geoJSON({ type: 'FeatureCollection', features }, {
           style: (feature) => {
             const fName = (
-              getVal(feature.properties, 'Full_Name') ||
-              getVal(feature.properties, 'Full_name') ||
-              ''
+              getFeatureName(feature.properties)
             ).toLowerCase();
 
             const match = renderer?.uniqueValueInfos?.find(
@@ -1650,7 +1646,7 @@
                   if (hits.length === 1) {
                     setActiveAreaItem(
                       getVal(hits[0].properties, 'Island'),
-                      getVal(hits[0].properties, 'Full_Name') || getVal(hits[0].properties, 'Full_name'),
+                      getFeatureName(hits[0].properties),
                     );
                     if (isMobileView()) {
                       try { activeLastBounds = L.geoJSON(hits[0]).getBounds(); }
@@ -1670,11 +1666,15 @@
                 group.eachLayer((l) => {
                   if (pointInFeatureGeometry(e.latlng, l.feature)) {
                     // Avoid duplicates if this feature was already added
-                    const id = getVal(l.feature.properties, 'Full_name') ||
-                               getVal(l.feature.properties, 'Full_Name');
-                    if (!map._haMMA_clickPending.hits.some((f) =>
-                      (getVal(f.properties, 'Full_name') || getVal(f.properties, 'Full_Name')) === id
-                    )) {
+                    const id = getVal(l.feature.properties, 'OBJECTID') ??
+                      getVal(l.feature.properties, 'ObjectId') ??
+                      `${getFeatureName(l.feature.properties)}|${JSON.stringify(l.feature.geometry?.coordinates?.[0]?.[0] || '')}`;
+                    if (!map._haMMA_clickPending.hits.some((f) => {
+                      const existingId = getVal(f.properties, 'OBJECTID') ??
+                        getVal(f.properties, 'ObjectId') ??
+                        `${getFeatureName(f.properties)}|${JSON.stringify(f.geometry?.coordinates?.[0]?.[0] || '')}`;
+                      return existingId === id;
+                    })) {
                       map._haMMA_clickPending.hits.push(l.feature);
                     }
                   }
