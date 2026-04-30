@@ -100,6 +100,13 @@
     title:    f.label,
     fieldKey: f.key,
   }));
+  const SUMMARY_GROUP_ORDER = ['prohibited', 'allowed', 'limited', 'other'];
+  const SUMMARY_GROUP_LABELS = {
+    prohibited: 'Prohibited',
+    allowed: 'Allowed',
+    limited: 'Allowed with limits',
+    other: 'Other / notes',
+  };
 
 
 
@@ -235,6 +242,95 @@
           ${bodyHtml}
         </div>`;
     }).join('');
+  }
+
+  function stripCalloutPrefix(text) {
+    return String(text)
+      .replace(/^(?:[-•]\s*)?(?:Prohibited|Allowed[^:]*)[^:]*:\s*/i, '')
+      .trim();
+  }
+
+  function buildSummarySources(features) {
+    return features.map((feature, index) => ({
+      id: index + 1,
+      feature,
+      name: getFeatureName(feature.properties),
+      className: `source-chip--${(index % 8) + 1}`,
+    }));
+  }
+
+  function renderSourceChip(source) {
+    return `<span class="source-chip ${source.className}" title="Source ${source.id}: ${escapeHtml(source.name)}" aria-label="Source ${source.id}: ${escapeHtml(source.name)}">
+      <span class="sr-only">Source </span>${source.id}
+    </span>`;
+  }
+
+  function renderSourceChips(sources) {
+    return sources.map((s) => renderSourceChip(s)).join('');
+  }
+
+  function splitRuleLines(text) {
+    if (!text || text === 'N/A') return [];
+    const calloutStart = /^(?:[-•]\s*)?(Prohibited[^:]*:|Allowed[^:]*:)/i;
+    const lines = normalizeRuleSegments(text)
+      .replace(/\r\n?/g, '\n')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const blocks = [];
+    let current = [];
+    lines.forEach((line) => {
+      if (calloutStart.test(line)) {
+        if (current.length) blocks.push(current.join('\n'));
+        current = [line];
+      } else if (current.length) {
+        current.push(line);
+      } else {
+        blocks.push(line);
+      }
+    });
+    if (current.length) blocks.push(current.join('\n'));
+    return blocks;
+  }
+
+  function classifyRuleLine(line) {
+    const value = String(line).trim();
+    const lower = value.toLowerCase();
+    if (/^prohibited\b/.test(lower)) return 'prohibited';
+    if (/^allowed\b.*\b(limit|limits|limitation|limitations)\b/.test(lower) || /^allowed\s+with\s+limits?\b/.test(lower)) return 'limited';
+    if (/^allowed\b/.test(lower)) return 'allowed';
+    return 'other';
+  }
+
+  function parseRuleField(text) {
+    return splitRuleLines(text).map((block) => ({
+      text: block,
+      status: classifyRuleLine(block.split('\n')[0] || block),
+    }));
+  }
+
+  function normalizeRuleForMerge(text) {
+    return String(text)
+      .replace(/\s+/g, ' ')
+      .replace(/[.]+$/g, '.')
+      .trim()
+      .toLowerCase();
+  }
+
+  function getAreaImages(feature) {
+    const props = feature?.properties || {};
+    const areaName = getFeatureName(props) || 'Managed area';
+    // TODO: Replace/augment this placeholder field mapping with ArcGIS
+    // attachment retrieval later. Keep returning this same normalized shape
+    // so carousel/card renderers do not need to change.
+    return ['Area_Image_URL_1', 'Area_Image_URL_2', 'Area_Image_URL_3']
+      .map((key) => getSafeUrl(getVal(props, key)))
+      .filter(Boolean)
+      .map((url) => ({
+        url,
+        alt: areaName,
+        caption: '',
+      }));
   }
 
 
@@ -1221,6 +1317,16 @@
     if (options.source === 'map' && latlng) {
       clearAccordionSelectionHighlight();
       updateClickMarker(latlng);
+      if (!isMobileView() && activeLastBounds) {
+        const leftWidth = getLeftOverlayWidth();
+        map.fitBounds(activeLastBounds, {
+          animate: true,
+          duration: 0.7,
+          paddingTopLeft: [Math.max(24, leftWidth + 24), 24],
+          paddingBottomRight: [24, 24],
+          maxZoom: 14,
+        });
+      }
     }
   }
 
@@ -1597,6 +1703,16 @@
                     activeLastBounds = null;
                   }
                   openInfoPanel(latlng, hits, { source: 'map' });
+                  if (!isMobileView() && activeLastBounds) {
+                    const leftWidth = getLeftOverlayWidth();
+                    map.fitBounds(activeLastBounds, {
+                      animate: true,
+                      duration: 0.7,
+                      paddingTopLeft: [Math.max(24, leftWidth + 24), 24],
+                      paddingBottomRight: [24, 24],
+                      maxZoom: 14,
+                    });
+                  }
                 });
               }
 
