@@ -1619,7 +1619,7 @@
             return { weight: 1.2, fillOpacity: 0.3, color: '#005a87' };
           },
 
-          onEachFeature: (_feature, layer) => {
+          onEachFeature: (feature, layer) => {
             // Hover hint on the map (desktop only — mobile has no hover state)
             layer.on('mouseover', () => {
               if (!isMobileView()) applyHoverHighlight(layer);
@@ -1630,6 +1630,11 @@
 
             layer.on('click', (e) => {
               L.DomEvent.stopPropagation(e);
+              map.stop();
+              if (_pendingMoveendHandler) {
+                map.off('moveend', _pendingMoveendHandler);
+                _pendingMoveendHandler = null;
+              }
               // Collect ALL features under this click point across all visible
               // layers, then open the panel once. We use a microtask so that
               // if two overlapping polygons both fire their click handler in
@@ -1658,6 +1663,20 @@
                   }
                   openInfoPanel(latlng, hits, { source: 'map' });
                 });
+              }
+
+              // Always include the clicked feature first. Some polygons with
+              // complex geometries can fail custom point-in-polygon checks.
+              const clickedId = getVal(feature.properties, 'OBJECTID') ??
+                getVal(feature.properties, 'ObjectId') ??
+                `${getFeatureName(feature.properties)}|${JSON.stringify(feature.geometry?.coordinates?.[0]?.[0] || '')}`;
+              if (!map._haMMA_clickPending.hits.some((f) => {
+                const existingId = getVal(f.properties, 'OBJECTID') ??
+                  getVal(f.properties, 'ObjectId') ??
+                  `${getFeatureName(f.properties)}|${JSON.stringify(f.geometry?.coordinates?.[0]?.[0] || '')}`;
+                return existingId === clickedId;
+              })) {
+                map._haMMA_clickPending.hits.push(feature);
               }
 
               // Accumulate hits for this click point
