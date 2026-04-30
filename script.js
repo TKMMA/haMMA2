@@ -1054,7 +1054,7 @@
     const multi = images.length > 1;
     const dots = multi
       ? `<div class="mmcard__image-dots" aria-hidden="true">
-           ${images.map((_, i) =>
+           ${safeImages.map((_, i) =>
              `<span class="mmcard__image-dot${i === 0 ? ' is-active' : ''}"></span>`
            ).join('')}
          </div>`
@@ -1272,6 +1272,16 @@
     if (options.source === 'map' && latlng) {
       clearAccordionSelectionHighlight();
       updateClickMarker(latlng);
+      if (!isMobileView() && activeLastBounds) {
+        const leftWidth = getLeftOverlayWidth();
+        map.fitBounds(activeLastBounds, {
+          animate: true,
+          duration: 0.7,
+          paddingTopLeft: [Math.max(24, leftWidth + 24), 24],
+          paddingBottomRight: [24, 24],
+          maxZoom: 14,
+        });
+      }
     }
   }
 
