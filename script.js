@@ -1171,15 +1171,28 @@
         });
       });
 
-      // Deduplicate notes: if all note entries are identical, collapse to one
-      if (statusMap.notes && statusMap.notes.length > 1) {
-        const unique = [...new Set(statusMap.notes.map((e) => _normaliseNote(e.text)))];
-        if (unique.length === 1) {
-          // All identical — keep one entry with a multi-source chip row
-          const sources_with_note = statusMap.notes.map((e) => e.source);
-          statusMap.notes = [{ source: null, sources: sources_with_note, text: statusMap.notes[0].text }];
-        }
-      }
+      // Deduplicate across ALL status types:
+      // If multiple sources share identical text for the same status,
+      // collapse them to a single entry showing all chips side-by-side.
+      Object.keys(statusMap).forEach((sk) => {
+        const entries = statusMap[sk];
+        if (entries.length < 2) return;
+
+        // Group entries by normalised text
+        const groups = {};
+        entries.forEach((e) => {
+          const key = _normaliseNote(e.text);
+          if (!groups[key]) groups[key] = { text: e.text, sources: [] };
+          groups[key].sources.push(e.source);
+        });
+
+        // Rebuild: collapsed where all sources share text, expanded otherwise
+        statusMap[sk] = Object.values(groups).map(({ text, sources }) =>
+          sources.length === 1
+            ? { source: sources[0], text }
+            : { source: null, sources, text }
+        );
+      });
 
       // Only include category if at least one status has entries
       const hasContent = Object.values(statusMap).some((entries) => entries.length > 0);
@@ -1438,12 +1451,7 @@
       panel.addEventListener('transitionend', onEnd);
     }
 
-    const label = btn.querySelector('.mmpopup__summary-trigger-label');
-    if (label) {
-      label.textContent = expand
-        ? 'Hide combined rules summary'
-        : 'Combined rules summary';
-    }
+    // label shows area count — stays static; pill text handles state
   }
 
   function toggleSummaryAccordion(btn) {
