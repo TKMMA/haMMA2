@@ -1619,3 +1619,61 @@ a {
   background: rgba(255,255,255,0.1);
   color: rgba(255,255,255,0.6);
 }
+/* ── SUMMARY CARD — FIELD-FIRST LAYOUT ──────────────────────── */
+
+/* Status group within a summary category block */
+.summary-status-group {
+  margin-bottom: 10px;
+}
+
+.summary-status-group:last-child {
+  margin-bottom: 0;
+}
+
+.summary-status-group__header {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: var(--border-radius-pill);
+  margin-bottom: 6px;
+}
+
+/* Each source entry within a status group */
+.summary-field-entry {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 4px 0 4px 4px;
+  border-left: 2px solid rgba(255,255,255,0.1);
+  margin-bottom: 4px;
+}
+
+.summary-field-entry:last-child {
+  margin-bottom: 0;
+}
+
+.summary-field-entry__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  flex-shrink: 0;
+  padding-top: 2px;
+  min-width: 24px;
+}
+
+/* Rule items inside summary — white text on dark background */
+.mmcard--summary .rule-item-list {
+  padding-left: 16px;
+}
+
+.mmcard--summary .rule-item {
+  color: rgba(255,255,255,0.88);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Remove old summary-rule-entry styles that conflict */
+.summary-rule-entry { display: none; }
