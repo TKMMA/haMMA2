@@ -1316,7 +1316,15 @@ a {
   }
 
   /* Drag zone is only the protruding tab — back button row is never covered */
-  /* Center the summary pill in the banner on mobile */
+  /* Summary banner on mobile — sticky so it stays visible while scrolling,
+     and pill centered */
+  .mmpopup__summary-banner {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
   .mmpopup__summary-banner__cta {
     align-items: center;
     padding: 8px 14px;
