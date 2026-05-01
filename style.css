@@ -1833,3 +1833,50 @@ a {
   top: 50%;
   transform: translateY(-50%);
 }
+/* ── OVERLAP NOTICE (single-area list selection) ─────────────── */
+
+.overlap-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, var(--color-brand-darkest), var(--color-brand-mid));
+  flex-shrink: 0;
+  /* Sticky so it stays visible while scrolling the card below */
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.overlap-notice__text {
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(255,255,255,0.92);
+}
+
+.overlap-notice__text strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 2px;
+}
+
+.overlap-notice__dismiss {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.6);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  border-radius: 3px;
+  margin-top: 1px;
+  transition: color 0.15s ease;
+}
+
+.overlap-notice__dismiss:hover {
+  color: #ffffff;
+}
