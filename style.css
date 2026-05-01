@@ -551,49 +551,70 @@ a {
   outline-offset: -3px;
 }
 
-/* Single-row CTA — count + action + chevron */
 .mmpopup__summary-banner__cta {
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  justify-content: center;
-  gap: 6px;
-  padding: 12px 14px;
+  gap: 10px;
+  padding: 14px 14px 12px;
   background: linear-gradient(135deg, var(--color-brand-darkest), var(--color-brand-mid));
   transition: filter var(--duration-fast);
 }
 
 .mmpopup__summary-banner:hover .mmpopup__summary-banner__cta {
-  filter: brightness(1.12);
+  filter: brightness(1.1);
 }
 
+/* "N overlapping areas" headline */
 .mmpopup__summary-trigger-label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: #ffffff;
-  line-height: 1.35;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
 }
-.mmpopup__summary-trigger-help {
+
+/* Pill CTA button — "See combined rules ▼" */
+.mmpopup__summary-trigger-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 999px;
+  padding: 5px 12px 5px 12px;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.mmpopup__summary-banner:hover .mmpopup__summary-trigger-pill {
+  background: rgba(255,255,255,0.28);
+  border-color: rgba(255,255,255,0.55);
+}
+
+.mmpopup__summary-trigger-pill-text {
   font-size: 11px;
-  color: rgba(255,255,255,0.88);
-  line-height: 1.4;
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .mmpopup__summary-trigger-chevron {
-  position: absolute;
-  right: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 11px;
-  color: rgba(255,255,255,0.85);
-  transition: transform 0.25s ease, translate 0.25s ease;
+  font-size: 9px;
+  color: rgba(255,255,255,0.9);
+  transition: transform 0.25s ease;
   flex-shrink: 0;
+  line-height: 1;
 }
 
-/* Rotate chevron when expanded */
+/* Rotate chevron and update pill text when expanded */
 .mmpopup__summary-banner[aria-expanded="true"] .mmpopup__summary-trigger-chevron {
   transform: rotate(180deg);
+}
+
+/* Update pill label when expanded — handled via JS attr */
+.mmpopup__summary-banner[aria-expanded="true"] .mmpopup__summary-trigger-pill-text {
+  /* text updated by JS to "Hide combined rules" */
 }
 
 /* Summary panel — drops below banner, same gradient for visual continuity */
@@ -734,16 +755,20 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  height: 20px;
+  min-width: 18px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: var(--chip-color, #275DAD);
   color: #ffffff;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   line-height: 1;
   flex-shrink: 0;
-  border: 1px solid rgba(255,255,255,0.35);
+  border: 1.5px solid rgba(255,255,255,0.3);
+  /* Optically align chip centre to cap-height of adjacent text */
+  margin-top: 1px;
+  vertical-align: middle;
 }
 .source-chip--1 { background: #275DAD; }
 .source-chip--2 { background: #A741E0; }
