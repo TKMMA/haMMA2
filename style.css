@@ -1444,3 +1444,178 @@ a {
 @media (max-width: 768px) {
   .info-sidebar > .brand-panel--info { display: none; }
 }
+
+/* ── STRUCTURED RULES RENDERING ─────────────────────────────── */
+
+/* Category block in area cards */
+.rules-category {
+  margin-bottom: 14px;
+}
+
+.rules-category:last-child {
+  margin-bottom: 0;
+}
+
+.rules-category__title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+/* Status block within a category */
+.rule-status-block {
+  margin-bottom: 8px;
+  border-radius: var(--border-radius-sm);
+  overflow: hidden;
+}
+
+.rule-status-block:last-child {
+  margin-bottom: 0;
+}
+
+.rule-status-block__header {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+}
+
+/* Status colour themes */
+.rule-status--prohibited .rule-status-block__header {
+  background: #fdf0f0;
+  color: var(--color-prohibited);
+  border-left: 3px solid var(--color-prohibited);
+}
+
+.rule-status--allowed .rule-status-block__header {
+  background: #f0faf0;
+  color: var(--color-allowed);
+  border-left: 3px solid var(--color-allowed);
+}
+
+.rule-status--limited .rule-status-block__header {
+  background: #fffbf0;
+  color: #7a5c00;
+  border-left: 3px solid #e6a800;
+}
+
+.rule-status--notes .rule-status-block__header {
+  background: var(--color-surface-search);
+  color: var(--color-text-secondary);
+  border-left: 3px solid var(--color-border-mid);
+}
+
+/* Rule items list */
+.rule-item-list {
+  margin: 0;
+  padding: 6px 10px 6px 24px;
+  list-style: disc;
+}
+
+.rule-item {
+  font-size: 12px;
+  color: var(--color-text-primary);
+  line-height: 1.5;
+  margin-bottom: 2px;
+}
+
+.rule-item:last-child {
+  margin-bottom: 0;
+}
+
+/* Legacy fallback */
+.rules-category__legacy {
+  font-size: 12px;
+}
+
+/* Empty state */
+.rules-empty {
+  font-size: 12px;
+  color: var(--color-text-hint);
+  font-style: italic;
+}
+
+/* ── SUMMARY CARD — NEW STATUS ENTRIES ───────────────────────── */
+
+/* Each source's status block within the summary */
+.summary-status-entry {
+  margin-bottom: 8px;
+  border-radius: var(--border-radius-sm);
+  overflow: hidden;
+}
+
+.summary-status-entry:last-child {
+  margin-bottom: 0;
+}
+
+.summary-status-entry__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+}
+
+/* Status label pill in summary */
+.rule-status-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: var(--border-radius-pill);
+}
+
+.rule-status-label.rule-status--prohibited {
+  background: rgba(160, 31, 31, 0.15);
+  color: #c0392b;
+}
+
+.rule-status-label.rule-status--allowed {
+  background: rgba(26, 107, 26, 0.15);
+  color: var(--color-allowed);
+}
+
+.rule-status-label.rule-status--limited {
+  background: rgba(230, 168, 0, 0.15);
+  color: #7a5c00;
+}
+
+.rule-status-label.rule-status--notes {
+  background: rgba(0,0,0,0.06);
+  color: var(--color-text-secondary);
+}
+
+/* Summary status entry items — white on dark summary card background */
+.mmcard--summary .rule-item {
+  color: rgba(255,255,255,0.9);
+}
+
+.mmcard--summary .summary-status-entry__header {
+  background: rgba(255,255,255,0.08);
+}
+
+.mmcard--summary .rule-status-label.rule-status--prohibited {
+  background: rgba(255,100,100,0.2);
+  color: #ffaaaa;
+}
+
+.mmcard--summary .rule-status-label.rule-status--allowed {
+  background: rgba(100,255,100,0.15);
+  color: #88dd88;
+}
+
+.mmcard--summary .rule-status-label.rule-status--limited {
+  background: rgba(255,220,80,0.18);
+  color: #ffd966;
+}
+
+.mmcard--summary .rule-status-label.rule-status--notes {
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.6);
+}
