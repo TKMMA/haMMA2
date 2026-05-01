@@ -1434,7 +1434,7 @@
       <div class="overlap-notice" role="status">
         <span class="overlap-notice__text">
           <strong>${overlapCount} other managed area${overlapCount === 1 ? '' : 's'} overlap${overlapCount === 1 ? 's' : ''} with this zone.</strong>
-          Tap the map to see combined rules.
+          Tap the map to see combined rules at a specific spot.
         </span>
         <button class="overlap-notice__dismiss" type="button" aria-label="Dismiss">✕</button>
       </div>` : '';
