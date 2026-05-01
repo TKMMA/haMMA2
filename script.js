@@ -572,9 +572,9 @@
       // Increase bottom padding significantly so the island chain sits in the
       // visible top half of the screen on load.
       map.fitBounds(INITIAL_CHAIN_BOUNDS, {
-        paddingTopLeft:     [12, 50],
-        paddingBottomRight: [12, 180],
-        maxZoom: 8.0,
+        paddingTopLeft:     [12, 40],
+        paddingBottomRight: [12, 260],
+        maxZoom: 7.8,
       });
       return;
     }
@@ -1431,9 +1431,8 @@
           data-area-count="${count}"
         >
           <span class="mmpopup__summary-banner__cta">
-            <span class="mmpopup__summary-trigger-label">There are ${count} overlapping areas at this location</span>
             <span class="mmpopup__summary-trigger-pill">
-              <span class="mmpopup__summary-trigger-pill-text">See combined rules</span>
+              <span class="mmpopup__summary-trigger-pill-text">See combined rules for all ${count} areas</span>
               <span class="mmpopup__summary-trigger-chevron" aria-hidden="true">▼</span>
             </span>
           </span>
@@ -1465,7 +1464,10 @@
     // Update pill label to match state
     const pillText = btn.querySelector('.mmpopup__summary-trigger-pill-text');
     if (pillText) {
-      pillText.textContent = expand ? 'Hide combined rules' : 'See combined rules';
+      const count = btn.dataset.areaCount || '';
+      pillText.textContent = expand
+        ? 'Hide combined rules'
+        : `See combined rules for all ${count} areas`;
     }
 
     const scroll = btn.closest('.mmpopup')?.querySelector('.mmpopup__scroll');
