@@ -71,7 +71,6 @@
         allowed:    'Rules_Gear_Allowed',
         limited:    'Rules_Gear_Limited',
       },
-      legacyKey: 'Rules_Gear',
     },
     {
       key:    'Species',
@@ -81,7 +80,6 @@
         allowed:    'Rules_Species_Allowed',
         limited:    'Rules_Species_Limited',
       },
-      legacyKey: 'Rules_species_size_bag',
     },
     {
       key:    'Activities',
@@ -92,7 +90,6 @@
         limited:    'Rules_Activities_Limited',
         notes:      'Rules_Activities_Notes',
       },
-      legacyKey: 'Rules_Activities',
     },
     {
       key:    'Seasons',
@@ -102,7 +99,6 @@
         allowed:    'Rules_Seasons_Allowed',
         limited:    'Rules_Seasons_Limited',
       },
-      legacyKey: 'Rules_Seasons_Times',
     },
     {
       key:    'Transit',
@@ -112,7 +108,6 @@
         allowed:    'Rules_Transit_Allowed',
         notes:      'Rules_Transit_Notes',
       },
-      legacyKey: 'Rules_transit_anchor',
     },
   ];
 
@@ -1101,28 +1096,17 @@
 
   // Render one rules category (e.g. Gear Rules) for an area card
   function renderRulesCategory(category, props) {
-    // Try new structured fields first
-    if (categoryHasNewFields(category, props)) {
-      const blocksHtml = Object.entries(category.fields)
-        .map(([statusKey, fieldKey]) => {
-          const val = getVal(props, fieldKey);
-          return renderRuleStatusBlock(statusKey, val);
-        })
-        .join('');
-      if (!blocksHtml.trim()) return '';
-      return `
-        <div class="rules-category">
-          <div class="rules-category__title">${category.label}</div>
-          ${blocksHtml}
-        </div>`;
-    }
-    // Fall back to legacy blob field with formatRuleText
-    const legacyVal = getVal(props, category.legacyKey);
-    if (!legacyVal) return '';
+    const blocksHtml = Object.entries(category.fields)
+      .map(([statusKey, fieldKey]) => {
+        const val = getVal(props, fieldKey);
+        return renderRuleStatusBlock(statusKey, val);
+      })
+      .join('');
+    if (!blocksHtml.trim()) return '';
     return `
       <div class="rules-category">
         <div class="rules-category__title">${category.label}</div>
-        <div class="rules-category__legacy">${formatRuleText(legacyVal)}</div>
+        ${blocksHtml}
       </div>`;
   }
 
@@ -1157,39 +1141,87 @@
       </div>`;
   }
 
+  // ── SUMMARY CARD — FIELD-FIRST LAYOUT ───────────────────────
+  //
+  // Layout: for each category (Gear, Species, etc.) group entries by
+  // status (Prohibited, Allowed, Limited, Notes). Within each status
+  // group, list all sources that have content, each with their chip.
+  // Transit_Notes are deduplicated — if multiple sources share the same
+  // note (very common boilerplate), it is shown once.
+
+  // Normalise a string for deduplication comparison
+  function _normaliseNote(text) {
+    return text.replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
   function buildCombinedRulesSummary(features) {
     const sources = buildSummarySources(features);
 
-    // For each category, collect entries per source using new fields with legacy fallback
+    // For each category → each status → collect { source, text } entries
     const categories = RULES_CATEGORIES.map((category) => {
-      const sourceEntries = sources.map((source) => {
+      // Build a map: statusKey → [ { source, text } ]
+      const statusMap = {};
+      Object.keys(category.fields).forEach((sk) => { statusMap[sk] = []; });
+
+      sources.forEach((source) => {
         const props = source.feature.properties;
+        Object.entries(category.fields).forEach(([statusKey, fieldKey]) => {
+          const val = (getVal(props, fieldKey) || '').trim();
+          if (val) statusMap[statusKey].push({ source, text: val });
+        });
+      });
 
-        // Check if new structured fields are populated
-        const hasNew = Object.values(category.fields)
-          .some((fk) => { const v = getVal(props, fk); return v && v.trim(); });
-
-        if (hasNew) {
-          // Return per-status blocks for this source
-          const blocks = Object.entries(category.fields)
-            .map(([statusKey, fieldKey]) => ({
-              statusKey,
-              text: getVal(props, fieldKey) || '',
-            }))
-            .filter((b) => b.text.trim());
-          return blocks.length ? { source, blocks, legacy: false } : null;
+      // Deduplicate notes: if all note entries are identical, collapse to one
+      if (statusMap.notes && statusMap.notes.length > 1) {
+        const unique = [...new Set(statusMap.notes.map((e) => _normaliseNote(e.text)))];
+        if (unique.length === 1) {
+          // All identical — keep one entry with a multi-source chip row
+          const sources_with_note = statusMap.notes.map((e) => e.source);
+          statusMap.notes = [{ source: null, sources: sources_with_note, text: statusMap.notes[0].text }];
         }
+      }
 
-        // Fall back to legacy blob field
-        const legacyVal = getVal(props, category.legacyKey);
-        if (legacyVal) return { source, legacyVal, legacy: true };
-        return null;
-      }).filter(Boolean);
-
-      return sourceEntries.length ? { category, sourceEntries } : null;
+      // Only include category if at least one status has entries
+      const hasContent = Object.values(statusMap).some((entries) => entries.length > 0);
+      return hasContent ? { category, statusMap } : null;
     }).filter(Boolean);
 
     return { sources, categories };
+  }
+
+  // Render a single status group within the summary card
+  // e.g. "Prohibited" header, then each source's chip + bullet list
+  function renderSummaryStatusGroup(statusKey, entries) {
+    if (!entries || !entries.length) return '';
+    const status = RULE_STATUS[statusKey];
+    if (!status) return '';
+
+    const entriesHtml = entries.map(({ source, sources: multiSources, text }) => {
+      // Chip: either a single source chip or a row of chips (deduplicated notes)
+      const chipHtml = multiSources
+        ? multiSources.map((s) => renderSourceChip(s)).join('')
+        : renderSourceChip(source);
+
+      const lines = text.split('\n').filter(Boolean);
+      const itemsHtml = lines.map((line) => {
+        const clean = line.replace(/^[-•]\s*/, '').trim();
+        return clean ? `<li class="rule-item">${escapeHtml(clean)}</li>` : '';
+      }).join('');
+
+      return `
+        <div class="summary-field-entry">
+          <div class="summary-field-entry__chips">${chipHtml}</div>
+          <ul class="rule-item-list">${itemsHtml}</ul>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="summary-status-group">
+        <div class="summary-status-group__header rule-status-label ${status.cls}">
+          ${status.label}
+        </div>
+        ${entriesHtml}
+      </div>`;
   }
 
   function buildSummaryPanel(features) {
@@ -1201,7 +1233,7 @@
         <div class="mmcard mmcard--summary overlap-summary-card">
           <div class="mmcard__body overlap-summary-intro">
             <div class="summary-card-label">Combined rules summary</div>
-            <p class="summary-explainer">Rules organized by category. Source chips show which area each rule comes from.</p>
+            <p class="summary-explainer">Rules by category and status. Source chips show which area each rule applies to.</p>
             <div class="summary-source-legend overlap-source-list">
               <div class="summary-source-legend__label">Areas included:</div>
               <ul class="summary-area-list">${summary.sources.map((source) => `
@@ -1212,20 +1244,15 @@
             </div>
             ${hasRules
               ? `<div class="summary-field-stack">
-                  ${summary.categories.map(({ category, sourceEntries }) => `
+                  ${summary.categories.map(({ category, statusMap }) => `
                     <div class="summary-field-block">
                       <div class="summary-section-title">${escapeHtml(category.label)}</div>
-                      ${sourceEntries.map(({ source, blocks, legacy, legacyVal }) =>
-                        legacy
-                          ? `<div class="summary-rule-entry">
-                               <div class="summary-rule-entry__chip">${renderSourceChip(source)}</div>
-                               <div class="summary-rule-entry__text">${formatRuleText(legacyVal)}</div>
-                             </div>`
-                          : blocks.map((b) => renderSummaryStatusBlock(b.statusKey, b.text, source)).join('')
-                      ).join('')}
+                      ${Object.entries(statusMap)
+                          .map(([sk, entries]) => renderSummaryStatusGroup(sk, entries))
+                          .join('')}
                     </div>`).join('')}
                 </div>`
-              : `<p class="summary-empty">No combined rule text is available for these selected areas.</p>`}
+              : `<p class="summary-empty">No rules on record for these areas.</p>`}
           </div>
         </div>
       </div>`;
