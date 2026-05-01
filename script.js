@@ -916,14 +916,33 @@
     return true;
   }
 
-  // Count how many loaded features contain a given latlng
-  // Used to show the overlap notification on list-selected areas
-  function countOverlapsAt(latlng, excludeFeature) {
+  // Count how many loaded features overlap with a given feature.
+  // Uses bounding-box intersection (fast) plus a centroid point-in-polygon
+  // check to filter obvious false positives from the bbox over-count.
+  // This handles large irregular polygons like West Hawai'i RFMA correctly.
+  function countOverlapsForFeature(targetLayer) {
+    if (!targetLayer) return 0;
+    const targetBounds = targetLayer.getBounds();
+    const targetCenter = targetBounds.getCenter();
     let count = 0;
     Object.values(allIslandLayers).forEach((group) => {
       group.eachLayer((layer) => {
-        if (layer.feature === excludeFeature) return;
-        if (pointInFeatureGeometry(latlng, layer.feature)) count++;
+        if (layer === targetLayer) return;
+        if (!layer.getBounds) return;
+        const lb = layer.getBounds();
+        // Quick bbox check first
+        if (!targetBounds.intersects(lb)) return;
+        // Confirm with point-in-polygon in either direction:
+        // does target's center fall in this layer, OR does this layer's
+        // center fall in target? Catches both large-contains-small and
+        // small-inside-large cases.
+        const layerCenter = lb.getCenter();
+        if (
+          pointInFeatureGeometry(targetCenter, layer.feature) ||
+          pointInFeatureGeometry(layerCenter, targetLayer.feature)
+        ) {
+          count++;
+        }
       });
     });
     return count;
@@ -1414,7 +1433,7 @@
     const noticeHtml = overlapCount > 0 ? `
       <div class="overlap-notice" role="status">
         <span class="overlap-notice__text">
-          <strong>${overlapCount} other managed area${overlapCount === 1 ? '' : 's'} overlap at this zone.</strong>
+          <strong>${overlapCount} other managed area${overlapCount === 1 ? '' : 's'} overlap${overlapCount === 1 ? 's' : ''} with this zone.</strong>
           Tap the map to see combined rules.
         </span>
         <button class="overlap-notice__dismiss" type="button" aria-label="Dismiss">✕</button>
@@ -1549,10 +1568,21 @@
     const areaName  = getFeatureName(features[0].properties) || 'Area Info';
     const count = features.length;
     // For list-selected single areas, count how many other features overlap
-    // at the area's centroid so we can show the notification banner.
+    // so we can show the notification banner.
     let overlapCount = 0;
-    if (!isMulti && options.source === 'menu' && latlng) {
-      overlapCount = countOverlapsAt(latlng, features[0]);
+    if (!isMulti && options.source === 'menu') {
+      // Find the Leaflet layer for this feature so we can use getBounds()
+      const areaName = getFeatureName(features[0].properties);
+      let targetLayer = null;
+      Object.values(allIslandLayers).some((group) => {
+        group.eachLayer((layer) => {
+          if (!targetLayer && getFeatureName(layer.feature?.properties) === areaName) {
+            targetLayer = layer;
+          }
+        });
+        return !!targetLayer;
+      });
+      if (targetLayer) overlapCount = countOverlapsForFeature(targetLayer);
     }
     infoContentEl.innerHTML = isMulti
       ? renderOverlapInfoPane(features)
