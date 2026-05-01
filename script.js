@@ -1504,6 +1504,15 @@
     }
 
     // label shows area count — stays static; pill text handles state
+    // Sync mobile header pill if present
+    const mobilePill = document.getElementById('mobile-summary-pill-btn');
+    if (mobilePill) {
+      mobilePill.setAttribute('aria-expanded', String(expand));
+      const chevron = mobilePill.querySelector('.mobile-summary-pill__chevron');
+      const text    = mobilePill.querySelector('.mobile-summary-pill__text');
+      if (chevron) chevron.style.transform = expand ? 'rotate(180deg)' : '';
+      if (text)    text.textContent = expand ? 'Hide rules' : 'Combined rules';
+    }
   }
 
   function toggleSummaryAccordion(btn) {
@@ -1538,6 +1547,49 @@
     const mobileTitle  = document.getElementById('info-banner-title-mobile');
     if (desktopTitle) desktopTitle.textContent = panelTitle;
     if (mobileTitle)  mobileTitle.textContent  = panelTitle;
+
+    // On mobile, inject the summary pill into the header row for multi-area
+    // so the CTA is visible immediately without scrolling.
+    const mobilePillSlot = document.getElementById('mobile-summary-pill-slot');
+    if (mobilePillSlot) {
+      if (isMulti) {
+        mobilePillSlot.innerHTML = `
+          <button
+            class="mobile-summary-pill"
+            type="button"
+            id="mobile-summary-pill-btn"
+            aria-expanded="false"
+            data-area-count="${count}"
+          >
+            <span class="mobile-summary-pill__text">Combined rules</span>
+            <span class="mobile-summary-pill__chevron" aria-hidden="true">▼</span>
+          </button>`;
+        // Wire pill click to toggle the summary accordion in the scroll area
+        const pillBtn = mobilePillSlot.querySelector('#mobile-summary-pill-btn');
+        if (pillBtn) {
+          pillBtn.addEventListener('click', () => {
+            const summaryBtn = infoContentEl.querySelector('[data-action="toggle-summary"]');
+            if (summaryBtn) toggleSummaryAccordion(summaryBtn);
+            // Sync pill aria-expanded with accordion state
+            const expanded = summaryBtn?.getAttribute('aria-expanded') === 'true';
+            pillBtn.setAttribute('aria-expanded', String(expanded));
+            pillBtn.querySelector('.mobile-summary-pill__chevron').style.transform =
+              expanded ? 'rotate(180deg)' : '';
+            pillBtn.querySelector('.mobile-summary-pill__text').textContent =
+              expanded ? 'Hide rules' : 'Combined rules';
+            // Scroll to summary panel when opening
+            if (expanded) {
+              setTimeout(() => {
+                infoContentEl.querySelector('.summary-accordion__panel--inline')
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              }, 50);
+            }
+          });
+        }
+      } else {
+        mobilePillSlot.innerHTML = '';
+      }
+    }
 
     if (isMobileView()) {
       applyMobileState('info-half');
