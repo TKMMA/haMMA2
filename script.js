@@ -598,6 +598,18 @@
 
   let _drag = null; // active drag session
 
+  function _removeDocListeners() {
+    document.removeEventListener('touchmove', _onDocDragMove);
+    document.removeEventListener('touchend',  _onDocDragEnd);
+    document.removeEventListener('touchcancel', _onDocDragEnd);
+  }
+
+  function _cancelDrag() {
+    _removeDocListeners();
+    paneStageEl?.classList.remove('is-dragging');
+    _drag = null;
+  }
+
   function onBannerDragStart(e, panel) {
     if (!isMobileView() || !paneStageEl) return;
     if (_drag) return;
@@ -624,34 +636,50 @@
 
     _drag = {
       panel,
-      startX:   touch.clientX,
-      startY:   touch.clientY,
-      baseY:    currentY,
+      startX:    touch.clientX,
+      startY:    touch.clientY,
+      baseY:     currentY,
       currentX,
-      lastY:    currentY,
-      lastTime: Date.now(),
-      velocity: 0,
+      lastY:     currentY,
+      lastTime:  Date.now(),
+      velocity:  0,
+      confirmed: false,   // true once vertical drag threshold is met
     };
+
+    // Add document-level listeners so touchmove/end are captured globally.
+    // This means the listeners are NOT on the scroll containers — zero conflict.
+    document.addEventListener('touchmove',   _onDocDragMove,  { passive: false });
+    document.addEventListener('touchend',    _onDocDragEnd,   { passive: false });
+    document.addEventListener('touchcancel', _onDocDragEnd,   { passive: false });
   }
 
-  function onBannerDragMove(e) {
+  // Called on document touchmove once a drag session is active
+  function _onDocDragMove(e) {
     if (!_drag) return;
-    const touch    = (e.touches || [e])[0];
+    const touch     = (e.touches || [e])[0];
     const absDeltaY = Math.abs((touch?.clientY || 0) - _drag.startY);
-    const absDeltaX = Math.abs((touch?.clientX || 0) - (_drag.startX || touch?.clientX || 0));
-    // Only hijack scroll after a clear vertical drag (> 6px vertical, not mostly horizontal)
-    if (absDeltaY < 6 || absDeltaX > absDeltaY * 1.5) return;
+    const absDeltaX = Math.abs((touch?.clientX || 0) - _drag.startX);
+
+    if (!_drag.confirmed) {
+      // Not yet confirmed as a drag — wait for threshold
+      if (absDeltaY < 6) return;                    // too small, wait
+      if (absDeltaX > absDeltaY * 1.5) {            // mostly horizontal — cancel
+        _cancelDrag();
+        return;
+      }
+      // Confirmed vertical drag — take ownership
+      _drag.confirmed = true;
+    }
+
+    // Only call preventDefault once confirmed — scroll is not yet blocked before this
     e.preventDefault();
 
     const deltaY   = touch.clientY - _drag.startY;
     const rawY     = _drag.baseY + deltaY;
-
-    // Clamp between full and hidden snap positions
-    const minY = snapY('list-full');  // highest (most visible)
-    const maxY = snapY('hidden');     // lowest (peeking)
+    const minY     = snapY('list-full');
+    const maxY     = snapY('hidden');
     const clampedY = Math.max(minY, Math.min(maxY, rawY));
 
-    // Track velocity
     const now = Date.now();
     const dt  = now - _drag.lastTime || 1;
     _drag.velocity = (clampedY - _drag.lastY) / dt;
@@ -661,19 +689,24 @@
     paneStageEl.style.transform = `translate(${_drag.currentX}px, ${clampedY}px)`;
   }
 
-  function onBannerDragEnd(e) {
+  // Called on document touchend/touchcancel
+  function _onDocDragEnd(e) {
     if (!_drag) return;
+    _removeDocListeners();
 
-    const currentY   = _drag.lastY;
-    const velocity   = _drag.velocity;
-    const panel      = _drag.panel;
+    if (!_drag.confirmed) {
+      // Never confirmed as drag — treat as tap, clean up quietly
+      paneStageEl.classList.remove('is-dragging');
+      _drag = null;
+      return;
+    }
 
-    // Re-enable CSS transitions, clear inline transform override
+    const currentY = _drag.lastY;
+    const velocity = _drag.velocity;
+    const panel    = _drag.panel;
+
     paneStageEl.classList.remove('is-dragging');
     paneStageEl.style.transform = '';
-
-    _drag = null;
-
     // Project 180ms forward to honour flick momentum
     const projectedY = currentY + velocity * 180;
 
@@ -689,10 +722,9 @@
   function wireSheetBannerDrag(zoneId, panel, opts = {}) {
     const zone = document.getElementById(zoneId);
     if (!zone) return;
-    zone.addEventListener('touchstart',  (e) => onBannerDragStart(e, panel), { passive: true });
-    zone.addEventListener('touchmove',   onBannerDragMove,  { passive: false });
-    zone.addEventListener('touchend',    onBannerDragEnd,   { passive: false });
-    zone.addEventListener('touchcancel', onBannerDragEnd,   { passive: false });
+    // Only touchstart on the zone — move/end are handled at document level
+    // once a drag is confirmed. This means scroll containers are never blocked.
+    zone.addEventListener('touchstart', (e) => onBannerDragStart(e, panel), { passive: true });
 
     // Tap on the info tab when collapsed → restore to info-half
     if (panel === 'info' && opts.enableRestoreTap) {
