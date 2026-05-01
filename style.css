@@ -1770,3 +1770,51 @@ a {
 .summary-field-entry__chips {
   display: none;
 }
+/* ── MOBILE SUMMARY PILL IN HEADER ──────────────────────────── */
+
+#mobile-summary-pill-slot {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-right: 6px;
+}
+
+.mobile-summary-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-family: var(--font);
+  color: #fff;
+  white-space: nowrap;
+  touch-action: manipulation;
+  transition: background 0.15s ease;
+}
+
+.mobile-summary-pill:hover,
+.mobile-summary-pill:active {
+  background: rgba(255,255,255,0.25);
+}
+
+.mobile-summary-pill__text {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mobile-summary-pill__chevron {
+  font-size: 8px;
+  transition: transform 0.2s ease;
+  line-height: 1;
+}
+
+/* When pill slot is populated, shrink the title to make room */
+#mobile-summary-pill-slot:not(:empty) ~ #info-banner-title-mobile,
+.info-mobile-header__row:has(#mobile-summary-pill-slot:not(:empty)) .info-mobile-header__title {
+  text-align: left;
+  flex: 1;
+}
