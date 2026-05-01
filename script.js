@@ -568,10 +568,13 @@
   function setInitialMapExtent() {
     if (!map) return;
     if (isMobileView()) {
+      // On mobile, the list sheet covers ~50% of the screen from the bottom.
+      // Increase bottom padding significantly so the island chain sits in the
+      // visible top half of the screen on load.
       map.fitBounds(INITIAL_CHAIN_BOUNDS, {
-        paddingTopLeft:     [12, 70],
-        paddingBottomRight: [12, 30],
-        maxZoom: 8.5,
+        paddingTopLeft:     [12, 50],
+        paddingBottomRight: [12, 180],
+        maxZoom: 8.0,
       });
       return;
     }
@@ -599,9 +602,13 @@
     if (!isMobileView() || !paneStageEl) return;
     if (_drag) return;
     // Don't intercept taps on interactive children (e.g. the back button).
-    // If the touch originated on a button or anchor, let the click fire.
+    // Check both the event target and the element at the touch coordinates,
+    // since on iOS the target can be the container rather than the child.
     const firstTouch = (e.touches || [e])[0];
-    if (firstTouch?.target?.closest('button, a')) return;
+    const targetEl   = firstTouch
+      ? (document.elementFromPoint(firstTouch.clientX, firstTouch.clientY) || firstTouch.target)
+      : e.target;
+    if (targetEl?.closest('button, a')) return;
     e.preventDefault();
 
     const touch = (e.touches || [e])[0];
@@ -615,6 +622,7 @@
 
     _drag = {
       panel,
+      startX:   touch.clientX,
       startY:   touch.clientY,
       baseY:    currentY,
       currentX,
@@ -626,9 +634,13 @@
 
   function onBannerDragMove(e) {
     if (!_drag) return;
+    const touch    = (e.touches || [e])[0];
+    const absDeltaY = Math.abs((touch?.clientY || 0) - _drag.startY);
+    const absDeltaX = Math.abs((touch?.clientX || 0) - (_drag.startX || touch?.clientX || 0));
+    // Only hijack scroll after a clear vertical drag (> 6px vertical, not mostly horizontal)
+    if (absDeltaY < 6 || absDeltaX > absDeltaY * 1.5) return;
     e.preventDefault();
 
-    const touch    = (e.touches || [e])[0];
     const deltaY   = touch.clientY - _drag.startY;
     const rawY     = _drag.baseY + deltaY;
 
@@ -976,18 +988,30 @@
     }, 1200);
   }
 
-  // Flash a polygon by area name without any map movement.
+  // Flash a polygon by area name without any map movement or selection change.
   // Used by the source legend buttons in the summary card.
+  // Auto-reverts to base style after 1.8s — doesn't affect active selection.
   function flashFeatureByName(areaName) {
     let found = false;
     Object.values(allIslandLayers).forEach((group) => {
       if (found) return;
       group.eachLayer((layer) => {
         if (found) return;
-        if (getFeatureName(layer.feature.properties) === areaName) {
-          found = true;
-          flashLayerBorder(layer);
-        }
+        if (getFeatureName(layer.feature.properties) !== areaName) return;
+        found = true;
+        if (typeof layer.setStyle !== 'function') return;
+        const base = getLayerBaseStyle(layer);
+        // Flash bright without touching activeAccordionLayer
+        layer.setStyle({ color: '#ffe066', weight: 5, opacity: 1, fillOpacity: base.fillOpacity });
+        setTimeout(() => {
+          layer.setStyle({ color: '#ffd60a', weight: Math.max(base.weight + 0.8, 2.2), opacity: 1, fillOpacity: base.fillOpacity });
+          setTimeout(() => {
+            // Revert to base — but respect active selection if it's this layer
+            if (activeAccordionLayer !== layer) {
+              layer.setStyle(base);
+            }
+          }, 1200);
+        }, 300);
       });
     });
   }
@@ -1382,12 +1406,8 @@
   }
 
   function renderOverlapHeader(features) {
-    const count = features.length;
-    return `
-      <div class="overlap-context">
-        <h3 class="overlap-context__title">Area-specific rules</h3>
-        <p class="overlap-context__copy">These cards preserve the original rules for each selected area.</p>
-      </div>`;
+    // Intentionally empty — renderAreaSpecificSection has its own title
+    return '';
   }
 
   function renderAreaSpecificSection(features) {
@@ -1411,7 +1431,7 @@
           data-area-count="${count}"
         >
           <span class="mmpopup__summary-banner__cta">
-            <span class="mmpopup__summary-trigger-label">${count} overlapping areas</span>
+            <span class="mmpopup__summary-trigger-label">There are ${count} overlapping areas at this location</span>
             <span class="mmpopup__summary-trigger-pill">
               <span class="mmpopup__summary-trigger-pill-text">See combined rules</span>
               <span class="mmpopup__summary-trigger-chevron" aria-hidden="true">▼</span>
