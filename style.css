@@ -58,10 +58,10 @@
   --font-mono: 'JetBrains Mono', 'Fira Mono', monospace;
 
   /* Sizing */
-  --sidebar-width:         320px;
-  --info-panel-width:      var(--sidebar-width);
-  --panel-margin:          15px;
-  --panel-gap:             calc(var(--panel-margin) + 12px);
+  --sidebar-width:         260px;
+  --info-panel-width:      300px;
+  --panel-margin:          12px;
+  --panel-gap:             8px;
   --top-band-height:       50px;
   --sheet-handle-height:   48px;
   --border-radius-sm:      6px;
@@ -361,7 +361,7 @@ a {
 .header-left {
   display: flex;
   align-items: center;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--color-text-primary);
   letter-spacing: 0.01em;
@@ -385,8 +385,8 @@ a {
 .area-list.active { display: block; }
 
 .area-item {
-  padding: 9px 14px 9px 38px;
-  font-size: 13px;
+  padding: 7px 12px 7px 34px;
+  font-size: 12px;
   color: var(--color-text-secondary);
   border-bottom: 1px solid var(--color-border-light);
   cursor: pointer;
@@ -555,23 +555,14 @@ a {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 10px;
-  padding: 14px 14px 12px;
+  gap: 0;
+  padding: 10px 14px;
   background: linear-gradient(135deg, var(--color-brand-darkest), var(--color-brand-mid));
   transition: filter var(--duration-fast);
 }
 
 .mmpopup__summary-banner:hover .mmpopup__summary-banner__cta {
   filter: brightness(1.1);
-}
-
-/* "N overlapping areas" headline */
-.mmpopup__summary-trigger-label {
-  font-size: 14px;
-  font-weight: 700;
-  color: #ffffff;
-  line-height: 1.2;
-  letter-spacing: 0.01em;
 }
 
 /* Pill CTA button — "See combined rules ▼" */
