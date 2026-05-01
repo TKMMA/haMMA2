@@ -57,6 +57,73 @@
   //   'rule'    — rule text with Allowed/Prohibited callouts
   //   'link'    — renders as a .reg-link button; requires linkText
   //   'join'    — joins multiple keys with <br>; requires keys[]
+  // ── NEW STRUCTURED RULES SCHEMA ─────────────────────────────
+  // Each category has Prohibited / Allowed / Limited sub-fields.
+  // Status is encoded in the field name — no parsing needed.
+  // The app reads new fields first; falls back to old blob fields
+  // for any area not yet migrated.
+  const RULES_CATEGORIES = [
+    {
+      key:    'Gear',
+      label:  'Gear Rules',
+      fields: {
+        prohibited: 'Rules_Gear_Prohibited',
+        allowed:    'Rules_Gear_Allowed',
+        limited:    'Rules_Gear_Limited',
+      },
+      legacyKey: 'Rules_Gear',
+    },
+    {
+      key:    'Species',
+      label:  'Species & Bag Limits',
+      fields: {
+        prohibited: 'Rules_Species_Prohibited',
+        allowed:    'Rules_Species_Allowed',
+        limited:    'Rules_Species_Limited',
+      },
+      legacyKey: 'Rules_species_size_bag',
+    },
+    {
+      key:    'Activities',
+      label:  'Activities Rules',
+      fields: {
+        prohibited: 'Rules_Activities_Prohibited',
+        allowed:    'Rules_Activities_Allowed',
+        limited:    'Rules_Activities_Limited',
+        notes:      'Rules_Activities_Notes',
+      },
+      legacyKey: 'Rules_Activities',
+    },
+    {
+      key:    'Seasons',
+      label:  'Seasons & Times',
+      fields: {
+        prohibited: 'Rules_Seasons_Prohibited',
+        allowed:    'Rules_Seasons_Allowed',
+        limited:    'Rules_Seasons_Limited',
+      },
+      legacyKey: 'Rules_Seasons_Times',
+    },
+    {
+      key:    'Transit',
+      label:  'Transit & Anchor',
+      fields: {
+        prohibited: 'Rules_Transit_Prohibited',
+        allowed:    'Rules_Transit_Allowed',
+        notes:      'Rules_Transit_Notes',
+      },
+      legacyKey: 'Rules_transit_anchor',
+    },
+  ];
+
+  // Status display config — label, colour class, rendered header
+  const RULE_STATUS = {
+    prohibited: { label: 'Prohibited',          cls: 'rule-status--prohibited' },
+    allowed:    { label: 'Allowed',              cls: 'rule-status--allowed'    },
+    limited:    { label: 'Allowed with limits',  cls: 'rule-status--limited'    },
+    notes:      { label: 'Notes',                cls: 'rule-status--notes'      },
+  };
+
   const FIELD_SCHEMA = {
     about: [
       {
@@ -73,11 +140,12 @@
       { key: 'DAR_URL',        label: 'Official DAR Page', format: 'link',  linkText: 'Official DAR page ›' },
     ],
     rules: [
+      // Kept for legacy fallback rendering — new rendering uses RULES_CATEGORIES
       { key: 'Rules_Gear',             label: 'Gear Rules',           format: 'rule' },
-      { key: 'Rules_Species_Size_Bag', label: 'Species & Bag Limits', format: 'rule' },
+      { key: 'Rules_species_size_bag', label: 'Species & Bag Limits', format: 'rule' },
       { key: 'Rules_Activities',       label: 'Activities Rules',     format: 'rule' },
       { key: 'Rules_Seasons_Times',    label: 'Seasons & Times',      format: 'rule' },
-      { key: 'Rules_Transit_Anchor',   label: 'Transit & Anchor',     format: 'rule' },
+      { key: 'Rules_transit_anchor',   label: 'Transit & Anchor',     format: 'rule' },
     ],
     laws: [
       { key: 'HAR_Name',  label: 'HAR Name' },
@@ -94,19 +162,8 @@
     ],
   };
 
-  // Summary card pulls from the rules tab fields — driven by schema so it
-  // stays in sync automatically if rules fields are ever added or reordered.
-  const SUMMARY_SCHEMA = FIELD_SCHEMA.rules.map((f) => ({
-    title:    f.label,
-    fieldKey: f.key,
-  }));
-  const SUMMARY_GROUP_ORDER = ['prohibited', 'allowed', 'limited', 'other'];
-  const SUMMARY_GROUP_LABELS = {
-    prohibited: 'Prohibited',
-    allowed: 'Allowed',
-    limited: 'Allowed with limits',
-    other: 'Other / notes',
-  };
+  // SUMMARY_SCHEMA — driven from RULES_CATEGORIES so it stays in sync
+  const SUMMARY_SCHEMA = RULES_CATEGORIES;
 
 
 
@@ -317,41 +374,6 @@
       .toLowerCase();
   }
 
-  function getAreaImages(feature) {
-    const props = feature?.properties || {};
-    const areaName = getFeatureName(props) || 'Managed area';
-    // TODO: Replace/augment this placeholder field mapping with ArcGIS
-    // attachment retrieval later. Keep returning this same normalized shape
-    // so carousel/card renderers do not need to change.
-    return ['Area_Image_URL_1', 'Area_Image_URL_2', 'Area_Image_URL_3']
-      .map((key) => getSafeUrl(getVal(props, key)))
-      .filter(Boolean)
-      .map((url) => ({
-        url,
-        alt: areaName,
-        caption: '',
-      }));
-  }
-
-
-  function buildSummarySources(features) {
-    return features.map((feature, index) => ({
-      id: index + 1,
-      feature,
-      name: getFeatureName(feature.properties),
-      className: `source-chip--${(index % 8) + 1}`,
-    }));
-  }
-
-  function renderSourceChip(source) {
-    return `<span class="source-chip ${source.className}" title="Source ${source.id}: ${escapeHtml(source.name)}" aria-label="Source ${source.id}: ${escapeHtml(source.name)}">
-      <span class="sr-only">Source </span>${source.id}
-    </span>`;
-  }
-
-  function renderSourceChips(sources) {
-    return sources.map((s) => renderSourceChip(s)).join('');
-  }
 
 
   function getAreaImages(feature) {
@@ -371,78 +393,8 @@
   }
 
 
-  function buildSummarySources(features) {
-    return features.map((feature, index) => ({
-      id: index + 1,
-      feature,
-      name: getFeatureName(feature.properties),
-      className: `source-chip--${(index % 8) + 1}`,
-    }));
-  }
-
-  function renderSourceChip(source) {
-    return `<span class="source-chip ${source.className}" title="Source ${source.id}: ${escapeHtml(source.name)}" aria-label="Source ${source.id}: ${escapeHtml(source.name)}">
-      <span class="sr-only">Source </span>${source.id}
-    </span>`;
-  }
-
-  function renderSourceChips(sources) {
-    return sources.map((s) => renderSourceChip(s)).join('');
-  }
 
 
-  function getAreaImages(feature) {
-    const props = feature?.properties || {};
-    const areaName = getFeatureName(props) || 'Managed area';
-    // TODO: Replace/augment this placeholder field mapping with ArcGIS
-    // attachment retrieval later. Keep returning this same normalized shape
-    // so carousel/card renderers do not need to change.
-    return ['Area_Image_URL_1', 'Area_Image_URL_2', 'Area_Image_URL_3']
-      .map((key) => getSafeUrl(getVal(props, key)))
-      .filter(Boolean)
-      .map((url) => ({
-        url,
-        alt: areaName,
-        caption: '',
-      }));
-  }
-
-
-  function buildSummarySources(features) {
-    return features.map((feature, index) => ({
-      id: index + 1,
-      feature,
-      name: getFeatureName(feature.properties),
-      className: `source-chip--${(index % 8) + 1}`,
-    }));
-  }
-
-  function renderSourceChip(source) {
-    return `<span class="source-chip ${source.className}" title="Source ${source.id}: ${escapeHtml(source.name)}" aria-label="Source ${source.id}: ${escapeHtml(source.name)}">
-      <span class="sr-only">Source </span>${source.id}
-    </span>`;
-  }
-
-  function renderSourceChips(sources) {
-    return sources.map((s) => renderSourceChip(s)).join('');
-  }
-
-
-  function getAreaImages(feature) {
-    const props = feature?.properties || {};
-    const areaName = getFeatureName(props) || 'Managed area';
-    // TODO: Replace/augment this placeholder field mapping with ArcGIS
-    // attachment retrieval later. Keep returning this same normalized shape
-    // so carousel/card renderers do not need to change.
-    return ['Area_Image_URL_1', 'Area_Image_URL_2', 'Area_Image_URL_3']
-      .map((key) => getSafeUrl(getVal(props, key)))
-      .filter(Boolean)
-      .map((url) => ({
-        url,
-        alt: areaName,
-        caption: '',
-      }));
-  }
 
 
   // ── 5. MAP INITIALISATION ────────────────────────────────────
@@ -1113,53 +1065,167 @@
       </div>`;
   }
 
-  // Render all fields for a given tab from the schema
+  // Render all fields for a given tab from the schema (used by About and Laws tabs)
   function renderTab(tabKey, props) {
     return (FIELD_SCHEMA[tabKey] || [])
       .map((entry) => renderSchemaField(entry, props))
       .join('');
   }
 
+  // ── NEW STRUCTURED RULES RENDERING ───────────────────────────
+  // Renders a single status block (Prohibited / Allowed / Limited / Notes)
+  function renderRuleStatusBlock(statusKey, text) {
+    if (!text || !text.trim()) return '';
+    const status = RULE_STATUS[statusKey];
+    if (!status) return '';
+    const lines = text.trim().split('\n').filter(Boolean);
+    const itemsHtml = lines.map((line) => {
+      // Strip leading dash if present
+      const clean = line.replace(/^[-•]\s*/, '').trim();
+      return clean ? `<li class="rule-item">${escapeHtml(clean)}</li>` : '';
+    }).join('');
+    return `
+      <div class="rule-status-block ${status.cls}">
+        <div class="rule-status-block__header">${status.label}</div>
+        <ul class="rule-item-list">${itemsHtml}</ul>
+      </div>`;
+  }
+
+  // Check if any new structured fields are populated for a category
+  function categoryHasNewFields(category, props) {
+    return Object.values(category.fields).some((fieldKey) => {
+      const val = getVal(props, fieldKey);
+      return val && val.trim();
+    });
+  }
+
+  // Render one rules category (e.g. Gear Rules) for an area card
+  function renderRulesCategory(category, props) {
+    // Try new structured fields first
+    if (categoryHasNewFields(category, props)) {
+      const blocksHtml = Object.entries(category.fields)
+        .map(([statusKey, fieldKey]) => {
+          const val = getVal(props, fieldKey);
+          return renderRuleStatusBlock(statusKey, val);
+        })
+        .join('');
+      if (!blocksHtml.trim()) return '';
+      return `
+        <div class="rules-category">
+          <div class="rules-category__title">${category.label}</div>
+          ${blocksHtml}
+        </div>`;
+    }
+    // Fall back to legacy blob field with formatRuleText
+    const legacyVal = getVal(props, category.legacyKey);
+    if (!legacyVal) return '';
+    return `
+      <div class="rules-category">
+        <div class="rules-category__title">${category.label}</div>
+        <div class="rules-category__legacy">${formatRuleText(legacyVal)}</div>
+      </div>`;
+  }
+
+  // Render the full Rules tab for an area card
+  function renderRulesTab(props) {
+    const html = RULES_CATEGORIES
+      .map((cat) => renderRulesCategory(cat, props))
+      .join('');
+    return html.trim()
+      ? html
+      : '<p class="rules-empty">No specific rules on record for this area.</p>';
+  }
+
+  // ── SUMMARY CARD — NEW STRUCTURED RENDERING ──────────────────
+  // Renders one status block for a single source area within the summary
+  function renderSummaryStatusBlock(statusKey, text, source) {
+    if (!text || !text.trim()) return '';
+    const status = RULE_STATUS[statusKey];
+    if (!status) return '';
+    const lines = text.trim().split('\n').filter(Boolean);
+    const itemsHtml = lines.map((line) => {
+      const clean = line.replace(/^[-•]\s*/, '').trim();
+      return clean ? `<li class="rule-item">${escapeHtml(clean)}</li>` : '';
+    }).join('');
+    return `
+      <div class="summary-status-entry">
+        <div class="summary-status-entry__header">
+          <span class="rule-status-label ${status.cls}">${status.label}</span>
+          ${renderSourceChip(source)}
+        </div>
+        <ul class="rule-item-list">${itemsHtml}</ul>
+      </div>`;
+  }
+
   function buildCombinedRulesSummary(features) {
     const sources = buildSummarySources(features);
-    const categories = SUMMARY_SCHEMA
-      .map((schemaRow) => {
-        const entries = sources
-          .map((source) => ({
-            source,
-            value: getVal(source.feature.properties, schemaRow.fieldKey),
-          }))
-          .filter((e) => e.value);
-        return { title: schemaRow.title, entries };
-      })
-      .filter((category) => category.entries.length > 0);
+
+    // For each category, collect entries per source using new fields with legacy fallback
+    const categories = RULES_CATEGORIES.map((category) => {
+      const sourceEntries = sources.map((source) => {
+        const props = source.feature.properties;
+
+        // Check if new structured fields are populated
+        const hasNew = Object.values(category.fields)
+          .some((fk) => { const v = getVal(props, fk); return v && v.trim(); });
+
+        if (hasNew) {
+          // Return per-status blocks for this source
+          const blocks = Object.entries(category.fields)
+            .map(([statusKey, fieldKey]) => ({
+              statusKey,
+              text: getVal(props, fieldKey) || '',
+            }))
+            .filter((b) => b.text.trim());
+          return blocks.length ? { source, blocks, legacy: false } : null;
+        }
+
+        // Fall back to legacy blob field
+        const legacyVal = getVal(props, category.legacyKey);
+        if (legacyVal) return { source, legacyVal, legacy: true };
+        return null;
+      }).filter(Boolean);
+
+      return sourceEntries.length ? { category, sourceEntries } : null;
+    }).filter(Boolean);
+
     return { sources, categories };
   }
 
   function buildSummaryPanel(features) {
     const summary = buildCombinedRulesSummary(features);
     const hasRules = summary.categories.length > 0;
+
     return `
       <div class="summary-accordion__panel--inline" hidden>
         <div class="mmcard mmcard--summary overlap-summary-card">
           <div class="mmcard__body overlap-summary-intro">
             <div class="summary-card-label">Combined rules summary</div>
-            <p class="summary-explainer">Rules are reorganized by category and status. Source chips indicate which selected area each rule line came from.</p>
+            <p class="summary-explainer">Rules organized by category. Source chips show which area each rule comes from.</p>
             <div class="summary-source-legend overlap-source-list">
               <div class="summary-source-legend__label">Areas included:</div>
-              <ul class="summary-area-list">${summary.sources.map((source) => `<li class="summary-area-name overlap-source-item">${renderSourceChip(source)} ${escapeHtml(source.name)}</li>`).join('')}</ul>
+              <ul class="summary-area-list">${summary.sources.map((source) => `
+                <li class="summary-area-name overlap-source-item">
+                  ${renderSourceChip(source)} ${escapeHtml(source.name)}
+                </li>`).join('')}
+              </ul>
             </div>
-            ${hasRules ? `<div class="summary-field-stack">
-              ${summary.categories.map((category) => `
-                <div class="summary-field-block">
-                  <div class="summary-section-title">${escapeHtml(category.title)}</div>
-                  ${category.entries.map((entry) => `
-                    <div class="summary-rule-entry">
-                      <div class="summary-rule-entry__chip">${renderSourceChip(entry.source)}</div>
-                      <div class="summary-rule-entry__text">${formatRuleText(entry.value)}</div>
+            ${hasRules
+              ? `<div class="summary-field-stack">
+                  ${summary.categories.map(({ category, sourceEntries }) => `
+                    <div class="summary-field-block">
+                      <div class="summary-section-title">${escapeHtml(category.label)}</div>
+                      ${sourceEntries.map(({ source, blocks, legacy, legacyVal }) =>
+                        legacy
+                          ? `<div class="summary-rule-entry">
+                               <div class="summary-rule-entry__chip">${renderSourceChip(source)}</div>
+                               <div class="summary-rule-entry__text">${formatRuleText(legacyVal)}</div>
+                             </div>`
+                          : blocks.map((b) => renderSummaryStatusBlock(b.statusKey, b.text, source)).join('')
+                      ).join('')}
                     </div>`).join('')}
-                </div>`).join('')}
-            </div>` : `<p class="summary-empty">No combined rule text is available for these selected areas.</p>`}
+                </div>`
+              : `<p class="summary-empty">No combined rule text is available for these selected areas.</p>`}
           </div>
         </div>
       </div>`;
@@ -1226,7 +1292,7 @@
           </div>
 
           <div id="rules-${uid}" class="tab-pane field-stack">
-            ${renderTab('rules', props)}
+            ${renderRulesTab(props)}
           </div>
 
           <div id="laws-${uid}" class="tab-pane field-stack" hidden>
