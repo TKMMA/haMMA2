@@ -755,20 +755,19 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  width: 18px;
-  height: 18px;
+  min-width: 16px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: var(--chip-color, #275DAD);
   color: #ffffff;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   line-height: 1;
   flex-shrink: 0;
-  border: 1.5px solid rgba(255,255,255,0.3);
-  /* Optically align chip centre to cap-height of adjacent text */
-  margin-top: 1px;
-  vertical-align: middle;
+  border: 1.5px solid rgba(255,255,255,0.25);
+  /* Align chip to first line of adjacent text */
+  margin-top: 2px;
 }
 .source-chip--1 { background: #275DAD; }
 .source-chip--2 { background: #A741E0; }
@@ -1685,8 +1684,8 @@ a {
   flex-wrap: wrap;
   gap: 3px;
   flex-shrink: 0;
-  padding-top: 2px;
-  min-width: 24px;
+  padding-top: 1px;
+  min-width: 16px;
 }
 
 /* Rule items inside summary — white text on dark background */
