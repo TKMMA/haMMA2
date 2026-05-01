@@ -916,6 +916,19 @@
     return true;
   }
 
+  // Count how many loaded features contain a given latlng
+  // Used to show the overlap notification on list-selected areas
+  function countOverlapsAt(latlng, excludeFeature) {
+    let count = 0;
+    Object.values(allIslandLayers).forEach((group) => {
+      group.eachLayer((layer) => {
+        if (layer.feature === excludeFeature) return;
+        if (pointInFeatureGeometry(latlng, layer.feature)) count++;
+      });
+    });
+    return count;
+  }
+
   function pointInFeatureGeometry(latlng, feature) {
     const geom = feature?.geometry;
     if (!geom) return false;
@@ -1397,9 +1410,18 @@
       </div>`;
   }
 
-  function renderSingleAreaInfoPane(feature) {
+  function renderSingleAreaInfoPane(feature, overlapCount) {
+    const noticeHtml = overlapCount > 0 ? `
+      <div class="overlap-notice" role="status">
+        <span class="overlap-notice__text">
+          <strong>${overlapCount} other managed area${overlapCount === 1 ? '' : 's'} overlap at this zone.</strong>
+          Tap the map to see combined rules.
+        </span>
+        <button class="overlap-notice__dismiss" type="button" aria-label="Dismiss">✕</button>
+      </div>` : '';
     return `
       <div class="mmpopup">
+        ${noticeHtml}
         <div class="mmpopup__scroll">
           ${buildAreaCard(feature, 'area-0')}
         </div>
@@ -1433,7 +1455,7 @@
         >
           <span class="mmpopup__summary-banner__cta">
             <span class="mmpopup__summary-trigger-pill">
-              <span class="mmpopup__summary-trigger-pill-text">See combined rules for all ${count} areas</span>
+              <span class="mmpopup__summary-trigger-pill-text">SEE COMBINED RULES FOR ${count} OVERLAPPING AREAS</span>
               <span class="mmpopup__summary-trigger-chevron" aria-hidden="true">▼</span>
             </span>
           </span>
@@ -1468,7 +1490,7 @@
       const count = btn.dataset.areaCount || '';
       pillText.textContent = expand
         ? 'Hide combined rules'
-        : `See combined rules for all ${count} areas`;
+        : `SEE COMBINED RULES FOR ${count} OVERLAPPING AREAS`;
     }
 
     const scroll = btn.closest('.mmpopup')?.querySelector('.mmpopup__scroll');
@@ -1526,9 +1548,15 @@
     const isMulti   = features.length > 1;
     const areaName  = getFeatureName(features[0].properties) || 'Area Info';
     const count = features.length;
+    // For list-selected single areas, count how many other features overlap
+    // at the area's centroid so we can show the notification banner.
+    let overlapCount = 0;
+    if (!isMulti && options.source === 'menu' && latlng) {
+      overlapCount = countOverlapsAt(latlng, features[0]);
+    }
     infoContentEl.innerHTML = isMulti
       ? renderOverlapInfoPane(features)
-      : renderSingleAreaInfoPane(features[0]);
+      : renderSingleAreaInfoPane(features[0], overlapCount);
 
     infoContentEl.querySelector('.mmpopup__scroll').scrollTop = 0;
 
@@ -2058,6 +2086,13 @@
     const flashPill = e.target.closest('[data-flash-area]');
     if (flashPill) {
       flashFeatureByName(flashPill.dataset.flashArea);
+      return;
+    }
+
+    // Overlap notice dismiss button
+    const dismissBtn = e.target.closest('.overlap-notice__dismiss');
+    if (dismissBtn) {
+      dismissBtn.closest('.overlap-notice')?.remove();
       return;
     }
 
