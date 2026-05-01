@@ -1316,6 +1316,11 @@ a {
   }
 
   /* Drag zone is only the protruding tab — back button row is never covered */
+  /* Hide scroll-area summary banner on mobile — header pill handles it */
+  .mmpopup__summary-banner {
+    display: none;
+  }
+
   .info-mobile-header .sheet-banner__drag-zone {
     position: absolute;
     top: calc(-1 * var(--sheet-tab-h));
@@ -1772,11 +1777,7 @@ a {
 }
 /* ── MOBILE SUMMARY PILL IN HEADER ──────────────────────────── */
 
-#mobile-summary-pill-slot {
-  flex-shrink: 0;
-  margin-left: auto;
-  padding-right: 6px;
-}
+/* #mobile-summary-pill-slot positioning is in the mobile @media block */
 
 .mobile-summary-pill {
   display: inline-flex;
@@ -1812,9 +1813,11 @@ a {
   line-height: 1;
 }
 
-/* When pill slot is populated, shrink the title to make room */
-#mobile-summary-pill-slot:not(:empty) ~ #info-banner-title-mobile,
-.info-mobile-header__row:has(#mobile-summary-pill-slot:not(:empty)) .info-mobile-header__title {
-  text-align: left;
-  flex: 1;
+/* Title always centered — pill slot positioned absolutely so it
+   doesn't affect the title's flex centering */
+#mobile-summary-pill-slot {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
 }
