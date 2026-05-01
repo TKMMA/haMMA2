@@ -524,12 +524,28 @@ a {
 
 .mmpopup {
   width: 100%;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
   background: var(--color-surface-base);
+  /* On mobile, mmpopup is a normal flow element inside info-content.
+     info-content is the single scroll container — mmpopup never clips. */
+}
+
+/* Desktop: mmpopup__scroll is the scroll container (not info-content) */
+@media (min-width: 769px) {
+  .mmpopup__scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .mmpopup {
+    height: 100%;
+    overflow: hidden;
+  }
+  .info-content {
+    overflow: hidden;
+  }
 }
 
 /* Full-width branded action banner — multi-area trigger */
@@ -626,12 +642,10 @@ a {
 
 .mmpopup__scroll {
   scroll-padding-top: 0;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior: contain;
   padding: 10px 12px 10px;
+  /* overflow and flex handled per-context:
+     desktop: overflow-y auto (in @media block above)
+     mobile:  overflow visible, parent info-content scrolls */
 }
 
 .mmpopup__scroll::-webkit-scrollbar { width: 5px; }
@@ -1225,13 +1239,23 @@ a {
   .info-sidebar .info-content {
     flex: 1;
     min-height: 0;
+    /* Single scroll container for all info panel content on mobile.
+       mmpopup and mmpopup__scroll are normal flow children — they
+       never clip or scroll themselves. */
     overflow-y: auto;
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
+  /* mmpopup fills content naturally — no fixed height */
   .info-sidebar .info-content .mmpopup {
-    height: 100%;
-    min-height: 0;
+    min-height: 100%;
+  }
+
+  /* mmpopup__scroll on mobile: not a scroll container, just flow */
+  .info-sidebar .info-content .mmpopup__scroll {
+    overflow: visible;
   }
 
   /* Desktop info-panel-header hidden on mobile */
@@ -1316,15 +1340,9 @@ a {
   }
 
   /* Drag zone is only the protruding tab — back button row is never covered */
-  /* Summary banner on mobile — sticky so it stays visible while scrolling,
-     and pill centered */
-  .mmpopup__summary-banner {
-    display: flex;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-  }
-
+  /* Summary banner and overlap notice on mobile — just flow normally.
+     No sticky needed since info-content is the scroll container and
+     the banner sits at the top of the content naturally. */
   .mmpopup__summary-banner__cta {
     align-items: center;
     padding: 8px 14px;
@@ -1842,10 +1860,6 @@ a {
   padding: 10px 14px;
   background: linear-gradient(135deg, var(--color-brand-darkest), var(--color-brand-mid));
   flex-shrink: 0;
-  /* Sticky so it stays visible while scrolling the card below */
-  position: sticky;
-  top: 0;
-  z-index: 10;
 }
 
 .overlap-notice__text {
