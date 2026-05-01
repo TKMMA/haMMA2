@@ -976,6 +976,22 @@
     }, 1200);
   }
 
+  // Flash a polygon by area name without any map movement.
+  // Used by the source legend buttons in the summary card.
+  function flashFeatureByName(areaName) {
+    let found = false;
+    Object.values(allIslandLayers).forEach((group) => {
+      if (found) return;
+      group.eachLayer((layer) => {
+        if (found) return;
+        if (getFeatureName(layer.feature.properties) === areaName) {
+          found = true;
+          flashLayerBorder(layer);
+        }
+      });
+    });
+  }
+
   function updateClickMarker(latlng) {
     if (activeSelectionMarker) map.removeLayer(activeSelectionMarker);
     activeSelectionMarker = L.marker(latlng).addTo(map);
@@ -1216,15 +1232,20 @@
         : renderSourceChip(source);
 
       const lines = text.split('\n').filter(Boolean);
-      const itemsHtml = lines.map((line) => {
+      // Chips go at the END of each bullet line
+      const itemsHtml = lines.map((line, idx) => {
         const clean = line.replace(/^[-•]\s*/, '').trim();
-        return clean ? `<li class="rule-item">${escapeHtml(clean)}</li>` : '';
+        if (!clean) return '';
+        // Only attach chips to the last line — keeps multi-line entries clean
+        const chipsAtEnd = idx === lines.length - 1
+          ? `<span class="rule-item__chips">${chipHtml}</span>`
+          : '';
+        return `<li class="rule-item">${escapeHtml(clean)}${chipsAtEnd}</li>`;
       }).join('');
 
       return `
         <div class="summary-field-entry">
-          <div class="summary-field-entry__chips">${chipHtml}</div>
-          <ul class="rule-item-list">${itemsHtml}</ul>
+          <ul class="rule-item-list rule-item-list--chipped">${itemsHtml}</ul>
         </div>`;
     }).join('');
 
@@ -1241,19 +1262,27 @@
     const summary = buildCombinedRulesSummary(features);
     const hasRules = summary.categories.length > 0;
 
+    // Source legend: each area is a pill-button that flashes its polygon
+    const legendHtml = summary.sources.map((source) => `
+      <button
+        class="summary-source-pill"
+        type="button"
+        data-flash-area="${escapeHtml(source.name)}"
+        title="Tap to highlight ${escapeHtml(source.name)} on the map"
+        aria-label="Highlight ${escapeHtml(source.name)} on map"
+      >
+        ${renderSourceChip(source)}
+        <span class="summary-source-pill__name">${escapeHtml(source.name)}</span>
+      </button>`).join('');
+
     return `
       <div class="summary-accordion__panel--inline" hidden>
         <div class="mmcard mmcard--summary overlap-summary-card">
           <div class="mmcard__body overlap-summary-intro">
             <div class="summary-card-label">Combined rules summary</div>
-            <p class="summary-explainer">Source chips show which area each rule applies to.</p>
-            <div class="summary-source-legend overlap-source-list">
-              <div class="summary-source-legend__label">Areas included:</div>
-              <ul class="summary-area-list">${summary.sources.map((source) => `
-                <li class="summary-area-name overlap-source-item">
-                  ${renderSourceChip(source)} ${escapeHtml(source.name)}
-                </li>`).join('')}
-              </ul>
+            <div class="summary-source-legend">
+              <div class="summary-source-legend__label">Tap an area to highlight it on the map:</div>
+              <div class="summary-source-pills">${legendHtml}</div>
             </div>
             ${hasRules
               ? `<div class="summary-field-stack">
@@ -1356,7 +1385,8 @@
     const count = features.length;
     return `
       <div class="overlap-context">
-        <h3 class="overlap-context__title">${count} overlapping areas selected</h3>
+        <h3 class="overlap-context__title">Area-specific rules</h3>
+        <p class="overlap-context__copy">These cards preserve the original rules for each selected area.</p>
       </div>`;
   }
 
@@ -1999,6 +2029,13 @@
     }
 
     // Summary accordion
+    // Source legend pill → flash polygon (no map movement)
+    const flashPill = e.target.closest('[data-flash-area]');
+    if (flashPill) {
+      flashFeatureByName(flashPill.dataset.flashArea);
+      return;
+    }
+
     const accordionToggle = e.target.closest('[data-action="toggle-summary"]');
     if (accordionToggle) {
       toggleSummaryAccordion(accordionToggle);
