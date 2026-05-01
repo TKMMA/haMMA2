@@ -1233,7 +1233,7 @@
         <div class="mmcard mmcard--summary overlap-summary-card">
           <div class="mmcard__body overlap-summary-intro">
             <div class="summary-card-label">Combined rules summary</div>
-            <p class="summary-explainer">Rules by category and status. Source chips show which area each rule applies to.</p>
+            <p class="summary-explainer">Source chips show which area each rule applies to.</p>
             <div class="summary-source-legend overlap-source-list">
               <div class="summary-source-legend__label">Areas included:</div>
               <ul class="summary-area-list">${summary.sources.map((source) => `
@@ -1344,7 +1344,6 @@
     return `
       <div class="overlap-context">
         <h3 class="overlap-context__title">${count} overlapping areas selected</h3>
-        <p class="overlap-context__copy">Review the combined summary first, then use the source cards below for original rule text.</p>
       </div>`;
   }
 
@@ -1369,9 +1368,11 @@
           data-area-count="${count}"
         >
           <span class="mmpopup__summary-banner__cta">
-            <span class="mmpopup__summary-trigger-label">Combined rules summary</span>
-            <span class="mmpopup__summary-trigger-help">Multiple regulated areas overlap here. Expand this summary to review rules reorganized by activity.</span>
-            <span class="mmpopup__summary-trigger-chevron" aria-hidden="true">▼</span>
+            <span class="mmpopup__summary-trigger-label">${count} overlapping areas</span>
+            <span class="mmpopup__summary-trigger-pill">
+              <span class="mmpopup__summary-trigger-pill-text">See combined rules</span>
+              <span class="mmpopup__summary-trigger-chevron" aria-hidden="true">▼</span>
+            </span>
           </span>
         </button>
         <div class="mmpopup__scroll">
@@ -1398,6 +1399,11 @@
   function setSummaryExpanded(btn, expand) {
     if (!btn) return;
     btn.setAttribute('aria-expanded', String(expand));
+    // Update pill label to match state
+    const pillText = btn.querySelector('.mmpopup__summary-trigger-pill-text');
+    if (pillText) {
+      pillText.textContent = expand ? 'Hide combined rules' : 'See combined rules';
+    }
 
     const scroll = btn.closest('.mmpopup')?.querySelector('.mmpopup__scroll');
     const panel  = scroll?.querySelector('.summary-accordion__panel--inline');
