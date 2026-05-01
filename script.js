@@ -609,7 +609,9 @@
       ? (document.elementFromPoint(firstTouch.clientX, firstTouch.clientY) || firstTouch.target)
       : e.target;
     if (targetEl?.closest('button, a')) return;
-    e.preventDefault();
+    // Do NOT preventDefault here — we don't know yet if this is a drag or scroll.
+    // preventDefault is called in onBannerDragMove only after a clear vertical drag
+    // is confirmed, which is what keeps the list scrollable.
 
     const touch = (e.touches || [e])[0];
 
@@ -661,7 +663,6 @@
 
   function onBannerDragEnd(e) {
     if (!_drag) return;
-    if (e) e.preventDefault();
 
     const currentY   = _drag.lastY;
     const velocity   = _drag.velocity;
@@ -688,7 +689,7 @@
   function wireSheetBannerDrag(zoneId, panel, opts = {}) {
     const zone = document.getElementById(zoneId);
     if (!zone) return;
-    zone.addEventListener('touchstart',  (e) => onBannerDragStart(e, panel), { passive: false });
+    zone.addEventListener('touchstart',  (e) => onBannerDragStart(e, panel), { passive: true });
     zone.addEventListener('touchmove',   onBannerDragMove,  { passive: false });
     zone.addEventListener('touchend',    onBannerDragEnd,   { passive: false });
     zone.addEventListener('touchcancel', onBannerDragEnd,   { passive: false });
