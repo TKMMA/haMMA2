@@ -598,82 +598,59 @@
 
   let _drag = null; // active drag session
 
-  function _removeDocListeners() {
-    document.removeEventListener('touchmove', _onDocDragMove);
-    document.removeEventListener('touchend',  _onDocDragEnd);
-    document.removeEventListener('touchcancel', _onDocDragEnd);
-  }
+  // ── DRAG SYSTEM ──────────────────────────────────────────────
+  // Pattern: touchstart on banner zones (passive) records intent.
+  // A passive touchmove listener on document tracks position until
+  // a clear vertical drag is confirmed (>8px vertical, not horizontal).
+  // Only then do we add a non-passive listener to take full control.
+  // This guarantees scroll containers are never blocked until we are
+  // certain the user intends to drag the sheet.
 
-  function _cancelDrag() {
-    _removeDocListeners();
+  function _cleanupDrag() {
+    document.removeEventListener('touchmove', _passiveDragWatch, { passive: true });
+    document.removeEventListener('touchmove', _activeDragMove);
+    document.removeEventListener('touchend',  _dragEnd);
+    document.removeEventListener('touchcancel', _dragEnd);
     paneStageEl?.classList.remove('is-dragging');
     _drag = null;
   }
 
-  function onBannerDragStart(e, panel) {
-    if (!isMobileView() || !paneStageEl) return;
-    if (_drag) return;
-    // Don't intercept taps on interactive children (e.g. the back button).
-    // Check both the event target and the element at the touch coordinates,
-    // since on iOS the target can be the container rather than the child.
-    const firstTouch = (e.touches || [e])[0];
-    const targetEl   = firstTouch
-      ? (document.elementFromPoint(firstTouch.clientX, firstTouch.clientY) || firstTouch.target)
-      : e.target;
-    if (targetEl?.closest('button, a')) return;
-    // Do NOT preventDefault here — we don't know yet if this is a drag or scroll.
-    // preventDefault is called in onBannerDragMove only after a clear vertical drag
-    // is confirmed, which is what keeps the list scrollable.
-
-    const touch = (e.touches || [e])[0];
-
-    // Read current Y from computed matrix (may be mid-transition)
-    // Cancel transition first so we get the settled value
-    paneStageEl.classList.add('is-dragging');
-    const matrix   = new DOMMatrix(getComputedStyle(paneStageEl).transform);
-    const currentY = matrix.f;
-    const currentX = matrix.e;
-
-    _drag = {
-      panel,
-      startX:    touch.clientX,
-      startY:    touch.clientY,
-      baseY:     currentY,
-      currentX,
-      lastY:     currentY,
-      lastTime:  Date.now(),
-      velocity:  0,
-      confirmed: false,   // true once vertical drag threshold is met
-    };
-
-    // Add document-level listeners so touchmove/end are captured globally.
-    // This means the listeners are NOT on the scroll containers — zero conflict.
-    document.addEventListener('touchmove',   _onDocDragMove,  { passive: false });
-    document.addEventListener('touchend',    _onDocDragEnd,   { passive: false });
-    document.addEventListener('touchcancel', _onDocDragEnd,   { passive: false });
-  }
-
-  // Called on document touchmove once a drag session is active
-  function _onDocDragMove(e) {
-    if (!_drag) return;
+  // Phase 1: passive observation — does NOT block scrolling
+  function _passiveDragWatch(e) {
+    if (!_drag) { _cleanupDrag(); return; }
     const touch     = (e.touches || [e])[0];
-    const absDeltaY = Math.abs((touch?.clientY || 0) - _drag.startY);
-    const absDeltaX = Math.abs((touch?.clientX || 0) - _drag.startX);
+    const absDeltaY = Math.abs(touch.clientY - _drag.startY);
+    const absDeltaX = Math.abs(touch.clientX - _drag.startX);
 
-    if (!_drag.confirmed) {
-      // Not yet confirmed as a drag — wait for threshold
-      if (absDeltaY < 6) return;                    // too small, wait
-      if (absDeltaX > absDeltaY * 1.5) {            // mostly horizontal — cancel
-        _cancelDrag();
-        return;
-      }
-      // Confirmed vertical drag — take ownership
-      _drag.confirmed = true;
+    if (absDeltaY < 8) return; // still ambiguous
+
+    if (absDeltaX > absDeltaY * 1.2) {
+      // Clearly horizontal — cancel drag intent entirely
+      _cleanupDrag();
+      return;
     }
 
-    // Only call preventDefault once confirmed — scroll is not yet blocked before this
+    // Clearly vertical drag confirmed — upgrade to active drag
+    document.removeEventListener('touchmove', _passiveDragWatch, { passive: true });
+
+    // Now read the pane position and lock in the base
+    paneStageEl.classList.add('is-dragging');
+    const matrix = new DOMMatrix(getComputedStyle(paneStageEl).transform);
+    _drag.baseY    = matrix.f;
+    _drag.currentX = matrix.e;
+    _drag.lastY    = matrix.f;
+    _drag.lastTime = Date.now();
+
+    // Add non-passive active handler
+    document.addEventListener('touchmove', _activeDragMove, { passive: false });
+  }
+
+  // Phase 2: active drag — has control, can preventDefault
+  function _activeDragMove(e) {
+    if (!_drag) return;
     e.preventDefault();
 
+    const touch    = (e.touches || [e])[0];
     const deltaY   = touch.clientY - _drag.startY;
     const rawY     = _drag.baseY + deltaY;
     const minY     = snapY('list-full');
@@ -689,23 +666,17 @@
     paneStageEl.style.transform = `translate(${_drag.currentX}px, ${clampedY}px)`;
   }
 
-  // Called on document touchend/touchcancel
-  function _onDocDragEnd(e) {
+  // Drag end — snap to nearest state
+  function _dragEnd() {
     if (!_drag) return;
-    _removeDocListeners();
+    const wasActive = paneStageEl.classList.contains('is-dragging');
+    const currentY  = _drag.lastY;
+    const velocity  = _drag.velocity;
+    const panel     = _drag.panel;
+    _cleanupDrag();
 
-    if (!_drag.confirmed) {
-      // Never confirmed as drag — treat as tap, clean up quietly
-      paneStageEl.classList.remove('is-dragging');
-      _drag = null;
-      return;
-    }
+    if (!wasActive) return; // tap, not drag — nothing to snap
 
-    const currentY = _drag.lastY;
-    const velocity = _drag.velocity;
-    const panel    = _drag.panel;
-
-    paneStageEl.classList.remove('is-dragging');
     paneStageEl.style.transform = '';
     // Project 180ms forward to honour flick momentum
     const projectedY = currentY + velocity * 180;
@@ -717,6 +688,35 @@
       .sort((a, b) => a.dist - b.dist)[0].state;
 
     applyMobileState(nearest);
+  }
+
+  function onBannerDragStart(e, panel) {
+    if (!isMobileView() || !paneStageEl) return;
+    if (_drag) return;
+
+    // Don't intercept taps on interactive children (back button, links, pills)
+    const firstTouch = (e.touches || [e])[0];
+    const targetEl   = firstTouch
+      ? (document.elementFromPoint(firstTouch.clientX, firstTouch.clientY) || firstTouch.target)
+      : e.target;
+    if (targetEl?.closest('button, a')) return;
+
+    // Record touch start. Do NOT touch paneStageEl yet — wait for confirmation.
+    _drag = {
+      panel,
+      startX:   firstTouch.clientX,
+      startY:   firstTouch.clientY,
+      baseY:    0,
+      currentX: 0,
+      lastY:    0,
+      lastTime: Date.now(),
+      velocity: 0,
+    };
+
+    // Phase 1: passive listener — browser can scroll freely
+    document.addEventListener('touchmove', _passiveDragWatch, { passive: true });
+    document.addEventListener('touchend',    _dragEnd, { passive: false });
+    document.addEventListener('touchcancel', _dragEnd, { passive: false });
   }
 
   function wireSheetBannerDrag(zoneId, panel, opts = {}) {
