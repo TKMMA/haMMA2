@@ -1271,6 +1271,21 @@ a {
     pointer-events: none;
   }
 
+  /* ── Mobile font size bumps ── */
+  /* List pane */
+  .area-item        { font-size: 14px; }
+  .island-header    { font-size: 13px; }
+
+  /* Info pane — cards, rules, tabs */
+  .mmcard__title    { font-size: 18px; }
+  .tab-label        { font-size: 12px; }
+  .rule-item        { font-size: 13px; }
+  .field-label      { font-size: 12px; }
+  .field-value      { font-size: 13px; }
+  .rules-category__title { font-size: 12px; }
+  .overlap-notice__text  { font-size: 13px; }
+  .summary-source-pill__name { font-size: 13px; }
+
   /* Safe-area scroll padding */
   .mmpopup__scroll {
     padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
