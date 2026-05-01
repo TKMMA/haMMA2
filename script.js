@@ -38,7 +38,7 @@
     "Oʻahu", "Molokaʻi", "Maui", "Lānaʻi", "Kauaʻi", "Hawaiʻi Island", "Kahoʻolawe",
   ];
 
-  const INITIAL_CHAIN_BOUNDS = L.latLngBounds([[18.9, -160.55], [22.35, -154.75]]);
+  const INITIAL_CHAIN_BOUNDS = L.latLngBounds([[18.9, -160.0], [22.35, -154.2]]);
 
   // Must match --duration-slow in style.css (400ms) + small buffer
   const SHEET_TRANSITION_MS = 420;
@@ -468,9 +468,9 @@
     const bh = 58; // --sheet-banner-h (brand panel / info header height)
     if (state === 'hidden')    return H * 0.92 - bh;
     if (state === 'list-open') return H * 0.50 - bh;
-    if (state === 'list-full') return H * 0.08;
+    if (state === 'list-full') return H * 0.03;       // near-full: grip tab still peeks
     if (state === 'info-half') return H * 0.50 - bh;
-    if (state === 'info-full') return H * 0.08;
+    if (state === 'info-full') return H * 0.22;       // 22% map visible for context
     return H * 0.92 - bh;
   }
 
@@ -572,9 +572,9 @@
       // Increase bottom padding significantly so the island chain sits in the
       // visible top half of the screen on load.
       map.fitBounds(INITIAL_CHAIN_BOUNDS, {
-        paddingTopLeft:     [12, 40],
-        paddingBottomRight: [12, 260],
-        maxZoom: 7.8,
+        paddingTopLeft:     [12, 30],
+        paddingBottomRight: [12, 320],
+        maxZoom: 8.3,
       });
       return;
     }
