@@ -1589,6 +1589,81 @@
 
 
   // ── 15. INFO PANEL — OPEN / CLOSE ────────────────────────────
+  // ── ABOUT PANE ───────────────────────────────────────────────
+
+  const README_HTML = `
+    <div class="about-pane">
+      <div class="about-pane__hero">
+        <h2 class="about-pane__title">haMMA — Hawaiʿi Managed Marine &amp; Freshwater Areas</h2>
+        <p class="about-pane__tagline">A public map for fishers, divers, and ocean users in Hawaiʿi.</p>
+      </div>
+
+      <section class="about-pane__section">
+        <p><em>All statewide fishing regulations still apply on top of each area’s specific rules.</em></p>
+      </section>
+
+      <section class="about-pane__section">
+        <h3>Why this exists</h3>
+        <p>Since the 1960s, the Hawaiʿi Division of Aquatic Resources (DAR) has established place-specific regulations for 90 different marine and freshwater areas across the state. These areas frequently overlap, and their rules are scattered across dense legal documents that are hard to find and harder to read.</p>
+        <p>Someone on a boat near Miloliʻi might be simultaneously inside the West Hawaiʿi Regional Fishery Management Area, the Miloliʻi CBSFA, the Miloliʻi FRA, and one or more sub-zones — each with different rules. haMMA makes that clear at a glance.</p>
+      </section>
+
+      <section class="about-pane__section">
+        <h3>How to use it</h3>
+        <p><strong>Tap or click the map</strong> at any location to see every managed area at that spot and the rules that apply — including overlapping areas combined into a single summary.</p>
+        <p><strong>Browse the list</strong> to find a specific area by island and name. When an area selected from the list overlaps with others, a notification tells you how many other areas share that zone.</p>
+      </section>
+
+      <section class="about-pane__section">
+        <h3>How rules are shown</h3>
+        <p>Each area card has three tabs: <strong>About</strong>, <strong>Rules</strong>, and <strong>Laws</strong>. Rules are organized by category — Gear, Species &amp; Bag Limits, Activities, Seasons &amp; Times, and Transit &amp; Anchor — and color-coded by status: Prohibited, Allowed, Allowed with limits, and Notes.</p>
+        <p>When multiple areas overlap, a combined summary reorganizes all rules into one unified view. Source chips show which area each rule comes from. Tapping an area name flashes that polygon on the map.</p>
+      </section>
+
+      <section class="about-pane__section">
+        <h3>Data &amp; accuracy</h3>
+        <p>Rules are sourced from official Hawaii Administrative Rules (HAR) and Hawaii Revised Statutes (HRS) documents. This tool is for informational purposes only and may not reflect the most recent amendments. Always verify rules with DAR before entering a managed area.</p>
+        <p>Links to official source documents are in the <strong>Laws</strong> tab of each area card.</p>
+      </section>
+
+      <section class="about-pane__section">
+        <h3>Contact</h3>
+        <p>Built by Tyler Kueffner for DAR and for Hawaiʿi’s fishers.</p>
+        <p>For suggested features, data corrections, questions, or bugs: <a href="mailto:tk85@hawaii.edu" class="about-pane__link">tk85@hawaii.edu</a></p>
+      </section>
+
+      <section class="about-pane__section about-pane__section--links">
+        <a href="https://dlnr.hawaii.gov/dar/" target="_blank" rel="noopener" class="about-pane__link">Division of Aquatic Resources ↗</a>
+      </section>
+    </div>`;
+
+  function openAboutPane() {
+    // Close any active map selection cleanly
+    clearMapSelection({ keepInfoOpen: false });
+
+    // Update header titles
+    const desktopTitle = document.getElementById('info-banner-title');
+    const mobileTitle  = document.getElementById('info-banner-title-mobile');
+    if (desktopTitle) desktopTitle.textContent = 'About';
+    if (mobileTitle)  mobileTitle.textContent  = 'About';
+
+    // Render into info panel
+    infoContentEl.innerHTML = `
+      <div class="mmpopup">
+        <div class="mmpopup__scroll">${README_HTML}</div>
+      </div>`;
+
+    // Open the info panel on mobile / desktop
+    if (isMobileView()) {
+      applyMobileState('info-half');
+    } else {
+      infoSidebarEl.classList.add('active');
+    }
+
+    // Clear list active state
+    clearAccordionSelectionHighlight();
+  }
+
   function openInfoPanel(latlng, features, options = {}) {
     activeLastLatlng  = latlng || null;
     lastSelectionSource = options.source || null;
@@ -2090,6 +2165,16 @@
 
       // Signal to screen readers that the list is ready
       islandListEl?.removeAttribute('aria-busy');
+
+      // Append "About this map" button at the bottom of the island list
+      if (islandListEl) {
+        const aboutBtn = document.createElement('button');
+        aboutBtn.type = 'button';
+        aboutBtn.className = 'about-map-btn';
+        aboutBtn.innerHTML = '<span class="about-map-btn__icon">ℹ</span><span class="about-map-btn__label">About this map</span>';
+        aboutBtn.addEventListener('click', openAboutPane);
+        islandListEl.appendChild(aboutBtn);
+      }
 
     } catch (err) {
       console.error('[haMMA] Failed to load service data:', err);
