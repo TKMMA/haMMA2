@@ -1286,9 +1286,11 @@ a {
   .overlap-notice__text  { font-size: 13px; }
   .summary-source-pill__name { font-size: 13px; }
 
-  /* Safe-area scroll padding */
-  .mmpopup__scroll {
-    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  /* Safe-area scroll padding — on mobile the actual scroll containers
+     are info-content and island-list, not mmpopup__scroll */
+  .info-sidebar .info-content,
+  .island-list {
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px) + var(--browser-offset, 0px));
   }
 
   /* ── Brand panel as drag surface (list side) ─────────── */
@@ -1908,4 +1910,107 @@ a {
 
 .overlap-notice__dismiss:hover {
   color: #ffffff;
+}
+/* ── ABOUT MAP BUTTON (bottom of island list) ────────────────── */
+
+.about-map-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 16px;
+  background: none;
+  border: none;
+  border-top: 2px solid var(--color-border-light);
+  margin-top: 8px;
+  cursor: pointer;
+  font-family: var(--font);
+  text-align: left;
+  color: var(--color-text-secondary);
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+
+.about-map-btn:hover {
+  background: var(--color-brand-lightest);
+  color: var(--color-brand-main);
+}
+
+.about-map-btn__icon {
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.about-map-btn__label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ── ABOUT PANE ───────────────────────────────────────────────── */
+
+.about-pane {
+  padding: 0 0 24px;
+}
+
+.about-pane__hero {
+  padding: 20px 16px 16px;
+  background: linear-gradient(135deg, var(--color-brand-darkest), var(--color-brand-mid));
+  margin-bottom: 4px;
+}
+
+.about-pane__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 6px;
+  line-height: 1.3;
+}
+
+.about-pane__tagline {
+  font-size: 12px;
+  color: rgba(255,255,255,0.8);
+  margin: 0;
+}
+
+.about-pane__section {
+  padding: 14px 16px 0;
+}
+
+.about-pane__section h3 {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  margin: 0 0 8px;
+}
+
+.about-pane__section p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  margin: 0 0 8px;
+}
+
+.about-pane__section p:last-child {
+  margin-bottom: 0;
+}
+
+.about-pane__section--links {
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border-light);
+  margin-top: 12px;
+}
+
+.about-pane__link {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-brand-main);
+  text-decoration: none;
+}
+
+.about-pane__link:hover {
+  text-decoration: underline;
 }
