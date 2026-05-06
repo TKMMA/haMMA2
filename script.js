@@ -606,11 +606,10 @@
         found = true;
         if (typeof layer.setStyle !== 'function') return;
         const base = getBaseStyle(layer);
-        layer.setStyle({ color: '#ffe066', weight: 5, opacity: 1, fillOpacity: base.fillOpacity });
+        _applyFlashStyle(layer, base);
         setTimeout(() => {
-          _applyFlashStyle(layer, base);
-          setTimeout(() => { if (activeAccordionLayer !== layer) layer.setStyle(base); }, 1200);
-        }, 300);
+          if (activeAccordionLayer !== layer) layer.setStyle(base);
+        }, 2400);  // 1200ms flash + 1200ms gold hold
       });
     });
   }
@@ -837,7 +836,7 @@
     const summary = buildCombinedRulesSummary(features);
     return `<div class="mmcard mmcard--summary overlap-summary-card" data-summary-card>
       ${renderSummaryHeader(features.length)}
-      <div class="mmcard__body summary-body" data-summary-body>
+      <div class="summary-body" data-summary-body>
         ${renderSummaryLegend(summary.sources)}
         ${renderSummaryRules(summary.categories)}
       </div>
@@ -903,15 +902,12 @@
   // ── Info pane HTML ────────────────────────────────────────────
   function renderSingleAreaInfoPane(feature, overlapCount) {
     const notice = overlapCount > 0 ? `
-      <div class="info-banner" role="status">
-        <svg class="info-banner__icon" viewBox="0 0 256 256" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M224,128a96,96,0,1,1-96-96A96,96,0,0,1,224,128Z" opacity="0.2"></path><path d="M144,176a8,8,0,0,1-8,8,16,16,0,0,1-16-16V128a8,8,0,0,1,0-16,16,16,0,0,1,16,16v40A8,8,0,0,1,144,176Zm88-48A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128ZM124,96a12,12,0,1,0-12-12A12,12,0,0,0,124,96Z"></path></svg>
-        <span class="info-banner__text">
-          <strong>${overlapCount} other managed area${overlapCount===1?'':'s'} overlap${overlapCount===1?'s':''} with this zone.</strong>
-          Tap the map to see combined rules at a specific spot.
-        </span>
+      <div class="overlap-notice" role="status">
+        <strong>${overlapCount} other managed area${overlapCount===1?'':'s'} overlap${overlapCount===1?'s':''} with this zone.</strong>
+        Tap the map to see combined rules at a specific spot.
       </div>` : '';
-    return `<div class="mmpopup">${notice}
-      <div class="mmpopup__scroll">${buildAreaCard(feature,'area-0')}</div>
+    return `<div class="mmpopup">
+      <div class="mmpopup__scroll">${notice}${buildAreaCard(feature,'area-0')}</div>
     </div>`;
   }
 
@@ -947,22 +943,22 @@
   function openAboutPane() {
     clearMapSelection();
     setPanelTitle('About');
- 
+
     // Read content from the <template id="about-content"> in index.html
     const tmpl = document.getElementById('about-content');
     const content = tmpl
       ? tmpl.content.cloneNode(true)
       : null;
- 
+
     if (content) {
       // Inject app last-updated from version.json (loaded at boot)
       const appSpan = content.querySelector('[data-app-updated]');
       if (appSpan) appSpan.textContent = window._haMMA_appVersion ?? '—';
- 
+
       // Inject data last-updated from ArcGIS editingInfo
       const dataSpan = content.querySelector('[data-data-updated]');
       if (dataSpan) dataSpan.textContent = dataLastUpdated ?? '—';
- 
+
       const wrapper = document.createElement('div');
       wrapper.className = 'mmpopup';
       const scroll = document.createElement('div');
@@ -975,7 +971,7 @@
       // Fallback if template is missing
       infoContentEl.innerHTML = '<div class="mmpopup"><div class="mmpopup__scroll"><p style="padding:16px">About content unavailable.</p></div></div>';
     }
- 
+
     openInfoView();
     clearAccordionSelectionHighlight();
     sharePayload = null;
@@ -1339,7 +1335,7 @@
       
       const editDate = metadata?.editingInfo?.dataLastEditDate;
       if (editDate) dataLastUpdated = new Date(editDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
-      
+
       const renderer      = metadata?.drawingInfo?.renderer;
       const globalOpacity = (100 - (metadata?.drawingInfo?.transparency || 0)) / 100;
 
