@@ -802,6 +802,9 @@
   }
 
   // ── Carousel ─────────────────────────────────────────────────
+  const CHEVRON_LEFT_SVG  = `<svg class="btn-icon" viewBox="0 0 256 256" aria-hidden="true"><path d="M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z"/></svg>`;
+  const CHEVRON_RIGHT_SVG = `<svg class="btn-icon" viewBox="0 0 256 256" aria-hidden="true"><path d="M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z"/></svg>`;
+
   function buildCarousel(images, areaName) {
     if (!images.length) return '';
     const encoded = images.map((img) => encodeURIComponent(JSON.stringify(img))).join('|');
@@ -812,9 +815,9 @@
          </div>` : '';
     const navs = multi
       ? `<button class="mmcard__image-nav mmcard__image-prev" type="button"
-           aria-label="Previous image" data-images="${encoded}" data-direction="-1">‹</button>
+           aria-label="Previous image" data-images="${encoded}" data-direction="-1">${CHEVRON_LEFT_SVG}</button>
          <button class="mmcard__image-nav mmcard__image-next" type="button"
-           aria-label="Next image" data-images="${encoded}" data-direction="1">›</button>` : '';
+           aria-label="Next image" data-images="${encoded}" data-direction="1">${CHEVRON_RIGHT_SVG}</button>` : '';
     return `<div class="mmcard__image-wrap" data-carousel-index="0">
       <img class="mmcard__image" src="${images[0].url}" alt="${escapeHtml(images[0].alt||areaName)}" loading="lazy">
       <div class="mmcard__image-fallback" hidden>Image unavailable</div>
@@ -831,14 +834,13 @@
       ${buildCarousel(images, name)}
       <div class="mmcard__body">
         <h3 class="mmcard__title">${escapeHtml(name)}</h3>
-        <div class="mmtabs">
-          <button type="button" data-tab-target="about-${uid}">ABOUT</button>
-          <button type="button" data-tab-target="rules-${uid}" class="active">RULES</button>
-          <button type="button" data-tab-target="laws-${uid}">LAWS</button>
+        <div class="card-meta-links">
+          <button type="button" class="card-meta-link" data-tab-target="about-${uid}">About</button>
+          <button type="button" class="card-meta-link" data-tab-target="sources-${uid}">Sources</button>
         </div>
-        <div id="about-${uid}" class="tab-pane field-stack" hidden>${renderTab('about',props)}</div>
-        <div id="rules-${uid}" class="tab-pane field-stack">${renderRulesTab(props)}</div>
-        <div id="laws-${uid}"  class="tab-pane field-stack" hidden>${renderTab('laws',props)}</div>
+        <div id="rules-${uid}"   class="tab-pane field-stack">${renderRulesTab(props)}</div>
+        <div id="about-${uid}"   class="tab-pane field-stack" hidden>${renderTab('about',props)}</div>
+        <div id="sources-${uid}" class="tab-pane field-stack" hidden>${renderTab('laws',props)}</div>
       </div>
     </div>`;
   }
@@ -851,7 +853,9 @@
           <strong>${overlapCount} other managed area${overlapCount===1?'':'s'} overlap${overlapCount===1?'s':''} with this zone.</strong>
           Tap the map to see combined rules at a specific spot.
         </span>
-        <button class="overlap-notice__dismiss" type="button" aria-label="Dismiss">✕</button>
+        <button class="overlap-notice__dismiss" type="button" aria-label="Dismiss">
+          <svg viewBox="0 0 256 256" style="width:12px;height:12px;fill:currentColor" aria-hidden="true"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg>
+        </button>
       </div>` : '';
     return `<div class="mmpopup">${notice}
       <div class="mmpopup__scroll">${buildAreaCard(feature,'area-0')}</div>
@@ -871,15 +875,31 @@
     </div>`;
   }
 
-  // ── Tab switching ────────────────────────────────────────────
+  // ── Tab switching ─────────────────────────────────────────────
+  // Handles both .card-meta-link buttons (About/Sources) and
+  // any legacy .mmtabs buttons. Rules pane is always visible by default.
   function showTab(btn, tabId) {
-    const section = btn.closest('.area-section');
-    if (!section) return;
-    section.querySelectorAll('.tab-pane').forEach((p) => { p.hidden = true; });
-    btn.parentElement.querySelectorAll('button').forEach((b) => b.classList.remove('active'));
-    const target = section.querySelector(`#${CSS.escape(tabId)}`);
+    const card = btn.closest('.area-section');
+    if (!card) return;
+    // Hide all tab panes
+    card.querySelectorAll('.tab-pane').forEach((p) => { p.hidden = true; });
+    // Show target
+    const target = card.querySelector(`#${CSS.escape(tabId)}`);
     if (target) target.hidden = false;
+    // Update active state on meta links
+    card.querySelectorAll('.card-meta-link').forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
+  }
+
+  // Dismiss meta link active state and restore rules pane
+  function restoreRulesPane(card) {
+    card.querySelectorAll('.tab-pane').forEach((p) => { p.hidden = true; });
+    card.querySelectorAll('.card-meta-link').forEach((b) => b.classList.remove('active'));
+    const uid = card.querySelector('[id^="rules-"]')?.id;
+    if (uid) {
+      const rulesPane = card.querySelector(`#${uid}`);
+      if (rulesPane) rulesPane.hidden = false;
+    }
   }
 
 
@@ -1085,10 +1105,10 @@
     if (!islandListEl) return;
     islandListEl.querySelector('.loading-notice')?.remove();
 
-    const id = islandName.replace(/[^a-zA-Z0-9]/g, '');
+    const id   = islandName.replace(/[^a-zA-Z0-9]/g, '');
     const frag = document.createDocumentFragment();
 
-    const group  = document.createElement('div');
+    const group = document.createElement('div');
     group.className = 'island-group';
 
     const header = document.createElement('button');
@@ -1100,16 +1120,29 @@
 
     const left = document.createElement('div');
     left.className = 'header-left';
-    const label = document.createElement('span');
-    label.textContent = islandName;
-    left.append(label);
 
-    const chevron = document.createElement('span');
-    chevron.className = 'chevron';
-    chevron.textContent = '▼';
-    chevron.setAttribute('aria-hidden', 'true');
+    const labelEl = document.createElement('span');
+    labelEl.textContent = islandName;
 
-    header.append(left, chevron);
+    // Area count badge
+    const countEl = document.createElement('span');
+    countEl.className   = 'island-count';
+    countEl.textContent = String(sortedNames.length);
+    countEl.setAttribute('aria-hidden', 'true');
+
+    left.append(labelEl, countEl);
+
+    // SVG chevron — Phosphor caret-down
+    const chevronNS = 'http://www.w3.org/2000/svg';
+    const chevronSvg = document.createElementNS(chevronNS, 'svg');
+    chevronSvg.setAttribute('viewBox', '0 0 256 256');
+    chevronSvg.setAttribute('aria-hidden', 'true');
+    chevronSvg.classList.add('chevron');
+    const chevronPath = document.createElementNS(chevronNS, 'path');
+    chevronPath.setAttribute('d', 'M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z');
+    chevronSvg.appendChild(chevronPath);
+
+    header.append(left, chevronSvg);
 
     const list = document.createElement('div');
     list.id = `list-${id}`;
@@ -1402,7 +1435,15 @@
   // Info content — delegated for tabs, flash pills, notices, carousel, summary
   infoContentEl?.addEventListener('click', (e) => {
     const tabBtn = e.target.closest('[data-tab-target]');
-    if (tabBtn) { showTab(tabBtn, tabBtn.dataset.tabTarget); return; }
+    if (tabBtn) {
+      // If already active, tap again → restore rules pane
+      if (tabBtn.classList.contains('active')) {
+        restoreRulesPane(tabBtn.closest('.area-section'));
+      } else {
+        showTab(tabBtn, tabBtn.dataset.tabTarget);
+      }
+      return;
+    }
 
     const flashPill = e.target.closest('[data-flash-area]');
     if (flashPill) { flashFeatureByName(flashPill.dataset.flashArea); return; }
