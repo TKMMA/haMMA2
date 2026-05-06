@@ -713,6 +713,14 @@ a { color: inherit; }
 .rule-item-list--chipped .rule-item {
   display: flex; align-items: baseline; gap: 6px; justify-content: space-between;
 }
+/* Restore bullet appearance for flex items (disc bullets disappear in flex) */
+.rule-item-list--chipped .rule-item::before {
+  content: '•';
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  margin-right: 2px;
+}
 .rule-item__chips {
   display: inline-flex; gap: 3px; flex-shrink: 0;
   align-items: center; position: relative; top: 1px;
@@ -737,26 +745,112 @@ a { color: inherit; }
 
 
 /* ── 14. OVERLAP NOTICE ─────────────────────────────────────── */
-.overlap-notice {
-  display: flex; align-items: flex-start; gap: 10px;
+/* ── INFO BANNERS — shared amber style ──────────────────────── */
+/*
+ * Two instances, one CSS component:
+ *   .info-banner                 — shared wrapper (amber, full-width)
+ *   .info-banner--notice         — overlap notice (static, informational)
+ *   .info-banner--toggle         — summary toggle (interactive button)
+ *
+ * Both are full-width, same amber background, same border, same padding.
+ * Difference: notice is a div, toggle is a button. Icon vs chevron.
+ */
+
+/* Amber notification tokens */
+:root {
+  --banner-bg:      #FEF3C7;
+  --banner-border:  #F59E0B;
+  --banner-text:    #000000;
+}
+
+.info-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 10px 14px;
-  background: linear-gradient(135deg, var(--brand-900), var(--brand-600));
+  background: var(--banner-bg);
+  border-bottom: 2px solid var(--banner-border);
+  flex-shrink: 0;
+  width: 100%;
+}
+
+/* Informational icon */
+.info-banner__icon {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--banner-text);
+  opacity: 0.7;
+}
+
+/* Main text / label */
+.info-banner__text {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--banner-text);
+}
+.info-banner__text strong {
+  font-weight: 700;
+  display: block;
+  margin-bottom: 1px;
+}
+
+/* Toggle: the entire banner is the button */
+.info-banner--toggle {
+  cursor: pointer;
+  border: none;
+  font-family: var(--font);
+  text-align: left;
+  transition: background var(--dur-fast);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.info-banner--toggle:hover { background: #FDE68A; }
+
+/* Toggle label — static, never changes */
+.info-banner__label {
+  flex: 1;
+  font-size: 12px; font-weight: 700;
+  color: var(--banner-text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Chevron on toggle */
+.info-banner__chevron {
+  width: 14px; height: 14px;
+  fill: var(--banner-text);
+  opacity: 0.6;
+  transition: transform var(--dur-mid);
   flex-shrink: 0;
 }
-.overlap-notice__text { flex: 1; font-size: 12px; line-height: 1.45; color: rgba(255,255,255,0.9); }
-.overlap-notice__text strong { display: block; font-weight: 700; color: #fff; margin-bottom: 2px; }
-.overlap-notice__dismiss {
-  flex-shrink: 0; background: none; border: none;
-  color: rgba(255,255,255,0.45); font-size: 12px;
-  cursor: pointer; padding: 2px 4px; border-radius: 3px;
-  transition: color var(--dur-fast);
+.info-banner--toggle[aria-expanded="true"] .info-banner__chevron {
+  transform: rotate(180deg);
 }
-.overlap-notice__dismiss:hover { color: #fff; }
 
-.area-specific-section { border-top: 1px solid var(--border-light); margin-top: 10px; padding-top: 10px; }
-.overlap-areas__title { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--brand-700); }
-.overlap-areas__copy { margin: 0 0 8px; font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
-.overlap-summary-intro { overflow-wrap: anywhere; }
+/* Summary body — starts open, collapses */
+.summary-body {
+  overflow: hidden;
+  transition: max-height 0.32s var(--ease-panel), opacity 0.22s ease;
+  max-height: 9999px;
+  opacity: 1;
+  pointer-events: auto;
+}
+.summary-body.is-closed {
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Area-specific section — no title/copy, just cards */
+.area-specific-section {
+  border-top: 1px solid var(--border-light);
+  margin-top: 2px;
+  padding-top: 10px;
+}
 
 
 /* ── 15. MISC CONTENT ───────────────────────────────────────── */
@@ -824,67 +918,6 @@ a { color: inherit; }
 .tab-pane { font-size: 13px; line-height: 1.6; color: var(--text-primary); }
 
 
-/* ── COLLAPSIBLE SUMMARY HEADER (sticky) ───────────────────── */
-.summary-toggle-btn {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 14px;
-  background: linear-gradient(135deg, var(--brand-900), var(--brand-600));
-  border: none;
-  font-family: var(--font);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: filter var(--dur-fast);
-  margin-bottom: 0;
-}
-.summary-toggle-btn:hover { filter: brightness(1.1); }
-
-.summary-toggle-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(255,255,255,0.12);
-  border: 1px solid rgba(255,255,255,0.25);
-  border-radius: var(--r-pill);
-  padding: 5px 12px;
-  font-size: 11px; font-weight: 700;
-  color: #fff; letter-spacing: 0.03em;
-  text-transform: uppercase;
-  transition: background var(--dur-fast);
-}
-.summary-toggle-btn:hover .summary-toggle-pill { background: rgba(255,255,255,0.2); }
-
-.summary-toggle-chevron {
-  width: 14px; height: 14px;
-  fill: rgba(255,255,255,0.8);
-  transition: transform var(--dur-mid);
-  flex-shrink: 0;
-}
-.summary-toggle-btn[aria-expanded="true"] .summary-toggle-chevron {
-  transform: rotate(180deg);
-}
-
-/* Summary body — animated expand/collapse */
-.summary-body {
-  overflow: hidden;
-  transition: max-height 0.32s var(--ease-panel), opacity 0.22s ease;
-  max-height: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-.summary-body.is-open {
-  max-height: 9999px; /* large enough */
-  opacity: 1;
-  pointer-events: auto;
-}
-
-
 /* ── UNIFIED STATUS PILLS (area cards + summary) ────────────── */
 /* Replaces the old rule-status-block left-border pattern on cards */
 /* Both contexts now use the same pill shape */
@@ -919,39 +952,6 @@ a { color: inherit; }
   background: var(--status-notes-bg);
   color: var(--text-secondary);
 }
-
-/* Area-specific section in overlap view */
-.area-specific-section { border-top: 1px solid var(--border-light); margin-top: 10px; padding-top: 10px; }
-.overlap-areas__title { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--brand-700); }
-.overlap-areas__copy { margin: 0 0 8px; font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
-
-
-/* ── OVERLAP NOTICE — PILL STYLE ────────────────────────────── */
-.overlap-notice {
-  display: flex; align-items: center; gap: 8px;
-  margin: 0 12px 10px;
-  padding: 7px 12px 7px 10px;
-  background: rgba(0,76,140,0.1);
-  border: 1px solid rgba(0,76,140,0.2);
-  border-radius: var(--r-pill);
-  flex-shrink: 0;
-}
-.overlap-notice__text {
-  flex: 1; font-size: 12px; line-height: 1.4;
-  color: var(--text-secondary);
-}
-.overlap-notice__text strong {
-  font-weight: 700; color: var(--text-primary);
-}
-.overlap-notice__dismiss {
-  flex-shrink: 0; background: none; border: none;
-  color: var(--text-hint); cursor: pointer;
-  padding: 2px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  transition: color var(--dur-fast);
-}
-.overlap-notice__dismiss:hover { color: var(--text-primary); }
-.overlap-notice__dismiss svg { width: 12px; height: 12px; fill: currentColor; }
 
 
 /* ── 17. SHARE TOAST ────────────────────────────────────────── */
@@ -1096,39 +1096,20 @@ a { color: inherit; }
   .info-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); }
 
   /* Font bumps */
-  .area-item      { font-size: 14px; height: 40px; }
+  .area-item      { font-size: 14px; min-height: 40px; }
   .island-header  { font-size: 12px; }
   .mmcard__title  { font-size: 17px; }
   .rule-item      { font-size: 13px; }
   .summary-source-pill__name { font-size: 13px; }
-  .overlap-notice__text      { font-size: 13px; }
+  .info-banner__text { font-size: 13px; }
 
-  /* Search bar on dark */
-  #area-search { background: var(--surface-raised); border-color: var(--border-brand); color: var(--text-primary); }
-  #area-search::placeholder { color: var(--text-muted); }
-  #area-search:focus { box-shadow: 0 0 0 3px rgba(77,168,218,0.15); border-color: var(--brand-300); }
-
-  /* Island header on dark */
+  /* Island header */
   .island-header { border-bottom-color: var(--border-light); background: var(--surface-tint); }
   .island-header:hover { background: var(--surface-raised); }
-  .header-left { color: var(--text-primary); }
-  .island-count { background: rgba(255,255,255,0.06); color: var(--text-muted); }
-  .chevron { fill: var(--text-muted); }
-
-  /* Overlap notice — dark panel variant */
-  .overlap-notice {
-    background: rgba(77,168,218,0.1);
-    border-color: rgba(77,168,218,0.2);
-  }
-  .overlap-notice__text { color: var(--text-secondary); }
-  .overlap-notice__text strong { color: var(--text-primary); }
-
-  /* Summary sticky header on dark */
-  .summary-toggle-btn { position: sticky; top: 0; z-index: 10; }
 
   /* Leaflet */
   .leaflet-control-zoom { display: none !important; }
 
   /* Toast */
-  .share-toast { bottom: calc(50dvh + 16px); background: #1E3D5C; }
+  .share-toast { bottom: calc(50dvh + 16px); }
 }
