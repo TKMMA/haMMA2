@@ -817,8 +817,8 @@
         <span class="summary-source-pill__name">${escapeHtml(s.name)}</span>
       </button>`).join('');
     return `<div class="summary-source-legend">
-          <div class="summary-source-legend__label">Tap an area to highlight it on the map:</div>
           <div class="summary-source-pills">${legendHtml}</div>
+          <div class="summary-source-legend__label">Tap an area to highlight it on the map</div>
         </div>`;
   }
 
