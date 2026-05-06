@@ -84,7 +84,17 @@
   /* Summary rhythm */
   --summary-pad: 14px;
   --summary-gap: 10px;
+
+  /* Banner */
+  --banner-bg:      #FEF3C7;
+  --banner-border:  #F59E0B;
+  --banner-text:    #000000;
 }
+
+/* Architecture note:
+ * Global tokens are defined once in the primary :root block above.
+ * Component sections below should consume tokens, not re-declare :root values.
+ */
 
 /* ── Mobile dark-panel token overrides ─────────────────────── */
 /* Applied inside the mobile @media block — desktop tokens unchanged */
@@ -787,13 +797,6 @@ a { color: inherit; }
  *
  * Banner is full-width and used for static overlap notices.
  */
-
-/* Amber notification tokens */
-:root {
-  --banner-bg:      #FEF3C7;
-  --banner-border:  #F59E0B;
-  --banner-text:    #000000;
-}
 
 .info-banner {
   display: flex;

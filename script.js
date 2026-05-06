@@ -139,6 +139,8 @@
   const searchClearEl  = document.getElementById('search-clear-btn');
   const shareToastEl   = document.getElementById('share-toast');
 
+  // Interaction contract: keep delegated selector strings centralized here
+  // so render + event wiring evolve together safely.
   const UI_SELECTORS = {
     tabTarget: '[data-tab-target]',
     flashArea: '[data-flash-area]',
