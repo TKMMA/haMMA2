@@ -3,8 +3,8 @@
    Copyright (c) 2026 Tyler Kueffner
    All rights reserved.
 
-   style.css  v4 — full visual redesign
-   Font: DM Sans (Google Fonts)
+   style.css  v5
+   Font: Inter (Google Fonts)
    ============================================================ */
 
 
@@ -24,7 +24,7 @@
   /* Panel surfaces — light grey */
   --surface:         #F0F4F8;   /* panel background */
   --surface-card:    #FFFFFF;   /* card background */
-  --surface-card-alt:#F5F8FB;   /* summary card — slightly darker tint */
+  --surface-card-alt:#E6EDF4;   /* summary card — distinctly stepped from white */
   --surface-tint:    #E8EFF5;
   --surface-search:  #E0E9F0;
   --surface-raised:  #FAFCFE;
@@ -58,8 +58,8 @@
   --selected-bg:     #DBEAFE;
   --selected-text:   var(--brand-700);
 
-  /* Typography */
-  --font: 'DM Sans', system-ui, -apple-system, sans-serif;
+  /* Typography — Inter */
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
 
   /* Panel geometry */
   --panel-w-list:    300px;
@@ -84,20 +84,12 @@
   /* Summary rhythm */
   --summary-pad: 14px;
   --summary-gap: 10px;
-
-  /* Banner */
-  --banner-bg:      #FEF3C7;
-  --banner-border:  #F59E0B;
-  --banner-text:    #000000;
 }
 
 /* Architecture note:
  * Global tokens are defined once in the primary :root block above.
  * Component sections below should consume tokens, not re-declare :root values.
  */
-
-/* ── Mobile dark-panel token overrides ─────────────────────── */
-/* Applied inside the mobile @media block — desktop tokens unchanged */
 
 
 /* ── 2. RESET & BASE ────────────────────────────────────────── */
@@ -141,7 +133,6 @@ a { color: inherit; }
 
 
 /* ── 4. SVG ICONS ───────────────────────────────────────────── */
-/* All Phosphor SVG icons share this base */
 .btn-icon {
   width: 18px; height: 18px;
   fill: currentColor;
@@ -168,20 +159,17 @@ a { color: inherit; }
   transition: transform var(--dur-slow) var(--ease-panel);
 }
 
-/* Header — gradient, consistent on both platforms */
 .panel-header {
   flex-shrink: 0;
   background: linear-gradient(160deg, var(--brand-900) 0%, var(--brand-600) 100%);
   position: relative;
 }
 
-/* Show correct header based on data-view */
 .panel-header__list,
 .panel-header__info { display: none; }
 .panel[data-view="list"] .panel-header__list { display: flex; flex-direction: column; }
 .panel[data-view="info"] .panel-header__info  { display: flex; flex-direction: column; }
 
-/* ── List header brand row — true three-column layout ───────── */
 .panel-header__brand {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -192,7 +180,6 @@ a { color: inherit; }
   position: relative;
 }
 
-/* Left slot: collapse button (desktop) or DAR logo (mobile) */
 .panel-header__brand-left {
   display: flex;
   align-items: center;
@@ -200,7 +187,6 @@ a { color: inherit; }
   flex-shrink: 0;
 }
 
-/* Center slot: title block */
 .brand-title-block {
   display: flex;
   flex-direction: column;
@@ -209,7 +195,6 @@ a { color: inherit; }
   min-width: 0;
 }
 
-/* Right slot: state seal */
 .panel-header__brand-right {
   display: flex;
   align-items: center;
@@ -229,9 +214,8 @@ a { color: inherit; }
   white-space: nowrap;
 }
 
-/* Collapse button — matches share/close button style exactly */
 .panel-collapse-btn {
-  display: none; /* desktop only */
+  display: none;
   width: 34px; height: 34px;
   flex-shrink: 0;
   background: rgba(255,255,255,0.08);
@@ -248,7 +232,6 @@ a { color: inherit; }
 }
 .panel-collapse-btn .btn-icon { width: 16px; height: 16px; }
 
-/* ── Info header ─────────────────────────────────────────────── */
 .panel-header__info-row {
   display: flex;
   align-items: center;
@@ -258,7 +241,6 @@ a { color: inherit; }
   position: relative;
 }
 
-/* Back button — primary action */
 .panel-back-btn {
   display: flex; align-items: center; gap: 6px;
   flex-shrink: 0;
@@ -281,7 +263,6 @@ a { color: inherit; }
 }
 .panel-back-btn .btn-icon { width: 15px; height: 15px; }
 
-/* Area title — centered, allows two lines */
 .panel-info-title {
   position: absolute;
   left: 50%; transform: translateX(-50%);
@@ -292,14 +273,12 @@ a { color: inherit; }
   overflow: hidden;
   pointer-events: none;
   max-width: 38%;
-  /* Allow up to 2 lines */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   line-height: 1.3;
 }
 
-/* Share + close */
 .panel-header__actions {
   display: flex; align-items: center; gap: 4px;
   margin-left: auto; flex-shrink: 0;
@@ -323,7 +302,6 @@ a { color: inherit; }
 .panel-share-btn .btn-icon,
 .panel-close-btn .btn-icon { width: 16px; height: 16px; }
 
-/* Grip handle — mobile only */
 .panel-header__grip {
   display: none;
   justify-content: center;
@@ -421,7 +399,6 @@ a { color: inherit; }
 }
 .retry-btn:hover { background: var(--brand-600); }
 
-/* Island accordion header */
 .island-header {
   display: flex; justify-content: space-between; align-items: center;
   padding: 9px 14px;
@@ -439,7 +416,6 @@ a { color: inherit; }
   letter-spacing: 0.02em; text-transform: uppercase;
 }
 
-/* Area count badge — right side against caret */
 .island-count {
   font-size: 10px; font-weight: 500;
   color: var(--text-muted);
@@ -448,8 +424,8 @@ a { color: inherit; }
   padding: 1px 7px;
   letter-spacing: 0;
   text-transform: none;
-  margin-left: auto;   /* push to right */
-  margin-right: 6px;   /* small gap before chevron */
+  margin-left: auto;
+  margin-right: 6px;
 }
 
 .chevron {
@@ -460,7 +436,6 @@ a { color: inherit; }
 }
 .island-header.expanded .chevron { transform: rotate(180deg); }
 
-/* Area items — compact density */
 .area-list { display: none; background: var(--surface); }
 .area-list.active { display: block; }
 
@@ -475,7 +450,6 @@ a { color: inherit; }
   cursor: pointer;
   line-height: 1.35;
   transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
-  /* Allow wrap — no truncation */
 }
 .area-item:hover {
   background: var(--brand-50);
@@ -489,7 +463,6 @@ a { color: inherit; }
   border-left-color: var(--brand-500);
 }
 
-/* About map button */
 .about-map-btn {
   display: flex; align-items: center; gap: 10px;
   width: 100%; padding: 13px 16px;
@@ -524,11 +497,6 @@ a { color: inherit; }
 
 
 /* ── 10. AREA CARDS — unified card system ───────────────────── */
-/*
- * One visual style for both area-specific cards AND the summary card.
- * .overlap-summary-card gets --surface-card-alt (slightly tinted).
- * Everything else — pills, text, borders, radius — is identical.
- */
 .mmcard {
   background: var(--surface-card);
   border: 1px solid var(--border-light);
@@ -537,7 +505,8 @@ a { color: inherit; }
   box-shadow: 0 1px 4px rgba(0,0,0,0.08);
   margin-bottom: 10px;
 }
-/* Summary card — slightly darker tint, same everything else */
+
+/* Summary card — stepped darker tint, slightly stronger border and shadow */
 .mmcard--summary,
 .overlap-summary-card {
   background: var(--surface-card-alt);
@@ -546,18 +515,23 @@ a { color: inherit; }
 .mmcard--summary {
   color: inherit;
   border-radius: var(--r-md);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
 }
 .overlap-summary-card { margin-bottom: 10px; overflow: hidden; }
 
-.mmcard__body        { padding: 12px 14px 14px; }
-.mmcard--summary .mmcard__body { padding: 14px; }
+.mmcard__body { padding: 12px 14px 14px; }
+
+/* Summary body owns its own padding so it collapses cleanly with content.
+   When .is-closed, padding collapses to zero — no blank space gap. */
+.mmcard--summary .mmcard__body {
+  padding: 0;
+}
 
 .mmcard__title {
   font-size: 16px; font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 6px; line-height: 1.25;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 
 .mmcard__image-wrap { position: relative; }
@@ -594,7 +568,6 @@ a { color: inherit; }
 }
 .mmcard__image-dot.is-active { background: #fff; }
 
-/* External link button */
 .reg-link {
   display: flex; align-items: center; justify-content: center; gap: 6px;
   margin-top: 8px; padding: 9px 14px;
@@ -638,9 +611,7 @@ a { color: inherit; }
 .rule-status-block { margin-bottom: 5px; }
 .rule-status-block:last-child { margin-bottom: 0; }
 
-/* ── STATUS PILLS — one style everywhere ────────────────────── */
-/* Used as: .rule-status-block__header, .rule-status-label,     */
-/*          .summary-status-group__header — all identical shape  */
+/* ── STATUS PILLS ────────────────────────────────────────────── */
 .rule-status-block__header,
 .rule-status-label,
 .summary-status-group__header {
@@ -679,35 +650,43 @@ a { color: inherit; }
 
 
 /* ── 13. SUMMARY CARD LAYOUT ────────────────────────────────── */
-/* Visual styling handled by .mmcard--summary above. Layout only. */
-/* Contract selectors used by JS: [data-summary-card], [data-summary-body], [data-action="toggle-summary"] */
+/* Contract selectors: [data-summary-card], [data-summary-body], [data-action="toggle-summary"] */
+
+/* Toggle button — matches mmcard__title in size and weight */
 .summary-card-toggle {
   width: 100%;
   display: flex; align-items: center; gap: 8px;
   background: transparent; border: none;
-  border-bottom: 1px solid var(--border-light);
   padding: var(--summary-pad);
   cursor: pointer; text-align: left;
+  /* Border only shows when body is open; removed when collapsed to avoid orphan line */
+  border-bottom: 1px solid var(--border-light);
 }
-.summary-card-toggle:hover { background: rgba(255,255,255,0.52); }
+.summary-card-toggle[aria-expanded="false"] {
+  border-bottom-color: transparent;
+}
+.summary-card-toggle:hover { background: rgba(255,255,255,0.4); }
+
+/* Label matches .mmcard__title: 16px bold, same letter-spacing */
 .summary-card-label {
   display: flex; align-items: center; gap: 8px;
-  font-size: 10px; font-weight: 700;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--text-muted);
+  font-size: 16px; font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
   margin: 0;
   flex: 1;
+  line-height: 1.25;
 }
 .summary-card-label::before {
   content: ''; display: block;
-  width: 3px; height: 12px; border-radius: 2px;
-  background: var(--border-mid); flex-shrink: 0;
+  width: 3px; height: 14px; border-radius: 2px;
+  background: var(--brand-400); flex-shrink: 0;
 }
 .summary-card-toggle__chevron {
-  width: 14px !important;
-  height: 14px !important;
-  min-width: 14px;
-  min-height: 14px;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px;
+  min-height: 16px;
   color: var(--text-muted);
   fill: currentColor;
   opacity: 0.7;
@@ -715,6 +694,23 @@ a { color: inherit; }
   flex-shrink: 0;
 }
 .summary-card-toggle[aria-expanded="true"] .summary-card-toggle__chevron { transform: rotate(180deg); }
+
+/* Summary body — owns its padding so collapse is clean */
+.summary-body {
+  overflow: hidden;
+  transition: max-height 0.32s var(--ease-panel), opacity 0.22s ease;
+  max-height: none;
+  opacity: 1;
+  pointer-events: auto;
+  padding: var(--summary-pad);
+}
+.summary-body.is-closed {
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+  padding-top: 0;
+  padding-bottom: 0;
+}
 
 .summary-source-legend__label { font-size: 11px; color: var(--text-muted); margin-bottom: 7px; }
 .summary-source-pills { display: flex; flex-direction: column; gap: 6px; margin-bottom: var(--summary-gap); }
@@ -756,7 +752,6 @@ a { color: inherit; }
   align-items: flex-start;
   gap: 6px;
 }
-/* Restore bullet appearance for flex items (disc bullets disappear in flex) */
 .rule-item-list--chipped .rule-item::before {
   content: '•';
   flex-shrink: 0;
@@ -788,64 +783,47 @@ a { color: inherit; }
 .source-chip--8 { background: #3D5A80; }
 
 
-/* ── 14. OVERLAP NOTICE ─────────────────────────────────────── */
-/* ── INFO BANNERS — shared amber style ──────────────────────── */
+/* ── 14. OVERLAP NOTICE — card style ────────────────────────── */
 /*
- * Two instances, one CSS component:
- *   .info-banner                 — shared wrapper (amber, full-width)
- *   .info-banner--notice         — overlap notice (static, informational)
- *
- * Banner is full-width and used for static overlap notices.
+ * Replaced amber banner with a card that pulls from existing design tokens.
+ * Uses the same mmcard shell, a left accent border in brand blue,
+ * and the Phosphor info SVG passed in via JS.
  */
-
 .info-banner {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
-  padding: 10px 14px;
-  background: var(--banner-bg);
-  border-bottom: 2px solid var(--banner-border);
-  flex-shrink: 0;
-  width: 100%;
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-brand);
+  border-left: 3px solid var(--brand-400);
+  border-radius: var(--r-md);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
 
-/* Informational icon */
 .info-banner__icon {
   flex-shrink: 0;
-  font-size: 14px;
-  line-height: 1;
-  color: var(--banner-text);
-  opacity: 0.7;
+  width: 18px; height: 18px;
+  color: var(--brand-400);
+  fill: currentColor;
+  margin-top: 1px;
 }
 
-/* Main text / label */
 .info-banner__text {
   flex: 1;
   font-size: 12px;
   font-weight: 500;
-  line-height: 1.45;
-  color: var(--banner-text);
+  line-height: 1.5;
+  color: var(--text-secondary);
 }
 .info-banner__text strong {
   font-weight: 700;
+  color: var(--text-primary);
   display: block;
-  margin-bottom: 1px;
+  margin-bottom: 2px;
 }
 
-
-/* Summary body — starts open, collapses */
-.summary-body {
-  overflow: hidden;
-  transition: max-height 0.32s var(--ease-panel), opacity 0.22s ease;
-  max-height: none;
-  opacity: 1;
-  pointer-events: auto;
-}
-.summary-body.is-closed {
-  max-height: 0;
-  opacity: 0;
-  pointer-events: none;
-}
 
 /* Area-specific section — no title/copy, just cards */
 .area-specific-section {
@@ -891,30 +869,29 @@ a { color: inherit; }
   border-left: 3px solid var(--border-mid);
   margin: 0;
 }
- 
+
 .about-pane__section--versions {
   border-top: 1px solid var(--border-light);
   margin-top: 12px;
   padding-top: 14px;
 }
- 
+
 .about-pane__versions {
   display: grid;
   gap: 6px;
   margin-bottom: 10px;
 }
- 
+
 .about-pane__version-row {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
-  font-size: 12px;
   padding: 7px 10px;
   background: var(--surface-tint);
   border-radius: var(--r-sm);
 }
- 
+
 .about-pane__version-label {
   color: var(--text-muted);
   font-weight: 600;
@@ -923,14 +900,14 @@ a { color: inherit; }
   font-size: 10px;
   flex-shrink: 0;
 }
- 
+
 .about-pane__version-value {
   color: var(--text-primary);
   font-weight: 500;
   font-size: 12px;
   text-align: right;
 }
- 
+
 .about-pane__version-note {
   font-size: 11px;
   color: var(--text-hint);
@@ -939,8 +916,8 @@ a { color: inherit; }
   line-height: 1.5;
 }
 
+
 /* ── PANEL VIEW SLIDE ANIMATION ─────────────────────────────── */
-/* Info slides in from right; list slides out to left */
 @keyframes slideInFromRight {
   from { transform: translateX(40px); opacity: 0; }
   to   { transform: translateX(0);    opacity: 1; }
@@ -978,8 +955,6 @@ a { color: inherit; }
 .tab-pane { font-size: 13px; line-height: 1.6; color: var(--text-primary); }
 
 
-/* Status pill styles are defined above in section 12 and shared by cards + summary. */
-
 /* ── 17. SHARE TOAST ────────────────────────────────────────── */
 .share-toast {
   position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
@@ -993,11 +968,10 @@ a { color: inherit; }
 .share-toast.is-visible { opacity: 1; }
 
 
-/* ── Panel surface — light grey, consistent on both platforms ── */
+/* ── Panel surface ───────────────────────────────────────────── */
 #panel {
   background: var(--surface);
 }
-
 
 
 @media (prefers-reduced-motion: reduce) {
@@ -1022,22 +996,15 @@ a { color: inherit; }
                 width var(--dur-mid) var(--ease-panel);
   }
 
-  /* Wider when showing info */
   .panel[data-view="info"] { width: var(--panel-w-info); }
 
   .panel.is-collapsed {
     transform: translateX(calc(-1 * var(--panel-w-info) - var(--panel-margin) - 4px));
   }
 
-  /* Show collapse button, hide grip */
   .panel-collapse-btn { display: flex; }
   .panel-header__grip { display: none !important; }
 
-  /* Desktop scroll ownership contract:
-   * - `.info-content` is the only scrolling element in info view.
-   * - Inner wrappers (`.mmpopup`, `.mmpopup__scroll`) stay layout-only.
-   * This prevents wheel/touchpad scroll trapping on nested cards.
-   */
   .info-content {
     overflow-y: auto;
     overflow-x: hidden;
@@ -1049,15 +1016,13 @@ a { color: inherit; }
     overflow: visible;
   }
 
-  /* Desktop logos — a bit larger */
   .brand-logo { width: 34px; height: 34px; }
   .brand-title-main { font-size: 15px; }
 
-  /* Reveal tab — flush to left edge of window, larger than before */
   .panel-reveal-btn {
     position: fixed;
-    top: var(--panel-margin);  /* same vertical position as panel top */
-    left: 0;                   /* flush to window edge — no gap */
+    top: var(--panel-margin);
+    left: 0;
     width: 44px;
     height: var(--panel-header-h);
     background: linear-gradient(160deg, var(--brand-900), var(--brand-600));
@@ -1083,7 +1048,7 @@ a { color: inherit; }
 }
 
 
-/* ── 19. MOBILE LAYOUT — DARK PANEL ────────────────────────── */
+/* ── 19. MOBILE LAYOUT ──────────────────────────────────────── */
 @media (max-width: 768px) {
 
   :root { --panel-header-h: 52px; }
@@ -1094,13 +1059,11 @@ a { color: inherit; }
     height: 100dvh;
     border-radius: var(--r-lg) var(--r-lg) 0 0;
     box-shadow: 0 -4px 24px rgba(0,0,0,0.35);
-    /* No border-top accent — let the rounded corners speak */
     transform: translateY(50dvh);
     will-change: transform;
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--browser-offset, 0px));
   }
 
-  /* Snap positions */
   .panel[data-snap="peek"] {
     transform: translateY(calc(100dvh - var(--panel-header-h) - var(--panel-grip-h)));
   }
@@ -1110,13 +1073,10 @@ a { color: inherit; }
 
   .panel.is-dragging { transition: none !important; }
 
-  /* Show grip */
   .panel-header__grip { display: flex; }
 
-  /* Search font 16px prevents iOS zoom */
   #area-search { font-size: 16px; }
 
-  /* Scrolling — ensure content not hidden behind browser chrome */
   .info-content {
     overflow-y: auto; -webkit-overflow-scrolling: touch;
     padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px) + var(--browser-offset, 0px));
@@ -1127,29 +1087,24 @@ a { color: inherit; }
   .mmpopup { min-height: 100%; }
   .mmpopup__scroll { overflow: visible; }
 
-  /* Hide desktop-only */
   .panel-collapse-btn { display: none !important; }
   .panel-reveal-btn   { display: none !important; }
 
-  /* Mobile scrollbar — barely visible on dark */
   .island-list::-webkit-scrollbar-thumb,
   .info-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); }
 
-  /* Font bumps */
   .area-item      { font-size: 14px; min-height: 40px; }
   .island-header  { font-size: 12px; }
   .mmcard__title  { font-size: 17px; }
   .rule-item      { font-size: 13px; }
   .summary-source-pill__name { font-size: 13px; }
   .info-banner__text { font-size: 13px; }
+  .summary-card-label { font-size: 17px; }
 
-  /* Island header */
   .island-header { border-bottom-color: var(--border-light); background: var(--surface-tint); }
   .island-header:hover { background: var(--surface-raised); }
 
-  /* Leaflet */
   .leaflet-control-zoom { display: none !important; }
 
-  /* Toast */
   .share-toast { bottom: calc(50dvh + 16px); }
 }
