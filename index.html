@@ -3,14 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
   <title>Hawaiʻi Marine & Freshwater Managed Areas</title>
   <meta name="description" content="Interactive map of Hawaii's managed marine and freshwater areas, maintained by the Division of Aquatic Resources." />
-
   <meta property="og:title" content="Hawaiʻi Marine & Freshwater Managed Areas" />
   <meta property="og:description" content="Interactive map of Hawaii's managed marine and freshwater areas." />
   <meta property="og:type" content="website" />
-
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
@@ -21,91 +18,109 @@
   <div class="map-interface">
 
     <!--
-      Single-DOM architecture — #island-list, #info-content, #area-search
-      exist exactly once. CSS repositions them between desktop panels and
-      the mobile bottom sheet via the .map-interface__panels wrapper.
-
-      DESKTOP: .map-sidebar and .info-sidebar float over the map.
-      MOBILE:  .map-sidebar becomes the bottom sheet (translateY driven by
-               data-snap + is-expanded). data-view="list"|"info" on
-               .map-interface__panels shows the correct aside.
+      Single panel, single DOM.
+      #panel holds both views; data-view="list"|"info" switches them.
+      CSS positions it as a left sidebar on desktop, bottom sheet on mobile.
+      All content — island list, info, search — lives here exactly once.
     -->
+    <aside id="panel" class="panel" data-view="list"
+           role="complementary" aria-label="Areas and rules">
 
-    <div class="map-interface__panels" id="panels" data-view="list">
+      <!-- ── PANEL HEADER ──────────────────────────────────────
+           One header element. Content changes with data-view.
+           - List view: brand logos + title + desktop collapse btn
+           - Info view: back btn (prominent) + area title + share + close
+      ──────────────────────────────────────────────────────── -->
+      <header class="panel-header" id="panel-header">
 
-      <!-- ── LIST PANEL ─────────────────────────────────────── -->
-      <aside id="map-sidebar" class="map-sidebar" role="complementary"
-             aria-label="Marine and freshwater areas list">
-
-        <!-- Brand header — also the mobile sheet banner (list view).
-             .sheet__handle-btn is hidden on desktop via CSS.             -->
-        <header class="brand-panel" id="brand-panel">
-          <button class="sheet__handle-btn" id="sheet-handle-btn"
-                  type="button" aria-label="Expand areas list"
-                  aria-expanded="false">
-            <span class="sheet__grip" aria-hidden="true"></span>
-          </button>
-          <div class="brand-header">
+        <!-- List header content -->
+        <div class="panel-header__list">
+          <!-- Mobile grip handle -->
+          <div class="panel-header__grip" id="panel-grip" aria-hidden="true">
+            <span class="grip-bar"></span>
+          </div>
+          <div class="panel-header__brand">
             <img class="brand-logo"
                  src="https://devdar.rapidteksolutions.com/wp-content/themes/react-ts-theme/assets/img/logo-dar.png"
-                 alt="Division of Aquatic Resources logo" width="36" height="36" />
+                 alt="Division of Aquatic Resources logo" width="32" height="32" />
             <div class="brand-title-block">
               <h1 class="brand-title-main">Managed Areas</h1>
             </div>
             <img class="brand-logo"
                  src="https://devdar.rapidteksolutions.com/wp-content/themes/react-ts-theme/assets/img/logo-state-of-hawai.png"
-                 alt="State of Hawaiʻi logo" width="36" height="36" />
+                 alt="State of Hawaiʻi logo" width="32" height="32" />
           </div>
-        </header>
+          <!-- Desktop collapse button -->
+          <button class="panel-collapse-btn" id="panel-collapse-btn"
+                  type="button" aria-label="Collapse panel" title="Collapse panel">
+            <span class="panel-collapse-btn__icon">‹</span>
+          </button>
+        </div>
 
-        <div class="sidebar-search-wrap">
-          <div class="search-input-wrapper">
-            <label for="area-search" class="sr-only">Search marine and freshwater areas</label>
-            <input type="text" id="area-search" placeholder="Search areas…"
-                   autocomplete="off" spellcheck="false" aria-controls="island-list" />
-            <button class="search-clear-btn" type="button"
-                    aria-label="Clear search" id="search-clear-btn">✕</button>
-            <span class="search-icon" aria-hidden="true">🔍</span>
+        <!-- Info header content -->
+        <div class="panel-header__info">
+          <!-- Mobile grip handle -->
+          <div class="panel-header__grip" aria-hidden="true">
+            <span class="grip-bar"></span>
+          </div>
+          <div class="panel-header__info-row">
+            <button class="panel-back-btn" id="panel-back-btn"
+                    type="button" aria-label="Back to areas list">
+              <span class="panel-back-btn__arrow">←</span>
+              <span class="panel-back-btn__label">Areas List</span>
+            </button>
+            <span class="panel-info-title" id="panel-info-title"
+                  aria-live="polite">Area Info</span>
+            <div class="panel-header__actions">
+              <button class="panel-share-btn" id="panel-share-btn"
+                      type="button" aria-label="Share this area" title="Share">
+                <span aria-hidden="true">⬆</span>
+              </button>
+              <button class="panel-close-btn" id="panel-close-btn"
+                      type="button" aria-label="Close and return to list" title="Close">
+                <span aria-hidden="true">✕</span>
+              </button>
+            </div>
           </div>
         </div>
 
+      </header><!-- /.panel-header -->
+
+      <!-- ── LIST VIEW ──────────────────────────────────────── -->
+      <div class="panel-view panel-view--list">
+        <div class="panel-search">
+          <div class="search-input-wrapper">
+            <label for="area-search" class="sr-only">Search areas</label>
+            <input type="text" id="area-search" placeholder="Search areas…"
+                   autocomplete="off" spellcheck="false" aria-controls="island-list" />
+            <button class="search-clear-btn" id="search-clear-btn"
+                    type="button" aria-label="Clear search">✕</button>
+            <span class="search-icon" aria-hidden="true">🔍</span>
+          </div>
+        </div>
         <div id="island-list" class="island-list" role="list"
              aria-label="Areas grouped by island" aria-live="polite" aria-busy="true">
           <div class="loading-notice" role="status">Loading marine areas…</div>
         </div>
+      </div>
 
-      </aside>
-
-      <!-- ── INFO PANEL ─────────────────────────────────────── -->
-      <aside id="info-sidebar" class="info-sidebar" role="region"
-             aria-label="Area details" aria-live="polite">
-
-        <!-- Desktop header -->
-        <div class="info-panel-header">
-          <span class="info-panel-header__title" id="info-banner-title"
-                aria-live="polite">Area Info</span>
-        </div>
-
-        <!-- Mobile info header: handle + back + title -->
-        <div class="info-mobile-header" id="info-mobile-header">
-          <button class="sheet__handle-btn" id="info-handle-btn"
-                  type="button" aria-label="Expand area details"
-                  aria-expanded="false">
-            <span class="sheet__grip" aria-hidden="true"></span>
-          </button>
-          <div class="info-mobile-header__row">
-            <button class="sheet__back-btn" id="sheet-back-btn"
-                    type="button" aria-label="Back to areas list">← Areas List</button>
-            <span class="info-mobile-header__title"
-                  id="info-banner-title-mobile">Area Info</span>
-          </div>
-        </div>
-
+      <!-- ── INFO VIEW ──────────────────────────────────────── -->
+      <div class="panel-view panel-view--info">
         <div id="info-content" class="info-content"></div>
+      </div>
 
-      </aside>
+    </aside><!-- /#panel -->
 
-    </div><!-- /#panels -->
+    <!-- Desktop panel-collapsed reveal tab -->
+    <button class="panel-reveal-btn" id="panel-reveal-btn"
+            type="button" aria-label="Open areas panel" title="Open panel">
+      <span class="panel-reveal-btn__icon">›</span>
+    </button>
+
+    <!-- Share toast -->
+    <div class="share-toast" id="share-toast" role="status" aria-live="polite" hidden>
+      Link copied!
+    </div>
 
     <div id="map" role="application"
          aria-label="Interactive map of Hawaii managed areas"></div>
