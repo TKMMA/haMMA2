@@ -1424,16 +1424,16 @@
   document.getElementById('panel-collapse-btn')?.addEventListener('click', collapsePanel);
   document.getElementById('panel-reveal-btn')?.addEventListener('click', expandPanel);
 
-  // Mobile grip drag
-  document.getElementById('panel-grip')?.addEventListener('touchstart', startDrag, { passive: true });
-  // Also allow dragging from the info header grip
-  document.querySelectorAll('.panel-header__grip').forEach((el) => {
-    el.addEventListener('touchstart', startDrag, { passive: true });
-  });
+  // Mobile grip drag — wire to ENTIRE panel header for large drag surface
+  // The grip visual is just decorative; the whole header is the drag target.
+  // Buttons inside the header are excluded by the button/a check in startDrag.
+  document.getElementById('panel-header')?.addEventListener('touchstart', startDrag, { passive: true });
 
-  // Tap grip when peeked → restore to half
-  document.getElementById('panel-grip')?.addEventListener('click', () => {
-    if (panelEl.dataset.snap === 'peek') setSnap('half');
+  // Tap header when peeked → restore to half (for users who tap rather than drag)
+  document.getElementById('panel-header')?.addEventListener('click', (e) => {
+    if (isMobile() && panelEl.dataset.snap === 'peek' && !e.target.closest('button,a')) {
+      setSnap('half');
+    }
   });
 
   // Info content — delegated for tabs, flash pills, notices, carousel, summary
