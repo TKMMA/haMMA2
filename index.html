@@ -28,21 +28,25 @@
             <span class="grip-bar"></span>
           </div>
           <div class="panel-header__brand">
-            <!-- Desktop collapse — left side, double caret -->
-            <button class="panel-collapse-btn" id="panel-collapse-btn"
-                    type="button" aria-label="Collapse panel">
-              <svg viewBox="0 0 256 256" aria-hidden="true"><path d="M208.49,199.51a12,12,0,0,1-17,17l-80-80a12,12,0,0,1,0-17l80-80a12,12,0,0,1,17,17L137,128ZM57,128l71.52-71.51a12,12,0,0,0-17-17l-80,80a12,12,0,0,0,0,17l80,80a12,12,0,0,0,17-17Z"/></svg>
-            </button>
-            <div class="brand-logos">
+            <!-- Left: collapse button (desktop only) + DAR logo -->
+            <div class="panel-header__brand-left">
+              <button class="panel-collapse-btn" id="panel-collapse-btn"
+                      type="button" aria-label="Collapse panel">
+                <svg class="btn-icon" viewBox="0 0 256 256" aria-hidden="true"><path d="M208.49,199.51a12,12,0,0,1-17,17l-80-80a12,12,0,0,1,0-17l80-80a12,12,0,0,1,17,17L137,128ZM57,128l71.52-71.51a12,12,0,0,0-17-17l-80,80a12,12,0,0,0,0,17l80,80a12,12,0,0,0,17-17Z"/></svg>
+              </button>
               <img class="brand-logo"
                    src="https://devdar.rapidteksolutions.com/wp-content/themes/react-ts-theme/assets/img/logo-dar.png"
                    alt="Division of Aquatic Resources" width="36" height="36" />
+            </div>
+            <!-- Center: title -->
+            <div class="brand-title-block">
+              <h1 class="brand-title-main">Managed Areas</h1>
+            </div>
+            <!-- Right: state seal -->
+            <div class="panel-header__brand-right">
               <img class="brand-logo"
                    src="https://devdar.rapidteksolutions.com/wp-content/themes/react-ts-theme/assets/img/logo-state-of-hawai.png"
                    alt="State of Hawaiʻi" width="36" height="36" />
-            </div>
-            <div class="brand-title-block">
-              <h1 class="brand-title-main">Managed Areas</h1>
             </div>
           </div>
         </div>
