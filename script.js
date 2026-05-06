@@ -36,7 +36,6 @@
   ];
 
   const INITIAL_CHAIN_BOUNDS = L.latLngBounds([[18.9, -160.0], [22.35, -154.2]]);
-  const PANEL_WIDTH          = 380;   // must match --panel-width in CSS
   const PANEL_MARGIN         = 12;    // must match --panel-margin in CSS
   const TRANSITION_MS        = 360;   // must match --dur-slow in CSS (0.36s)
   const MOBILE_MQ            = window.matchMedia('(max-width: 768px)');
@@ -445,10 +444,10 @@
 
   // ── 8. MAP GEOMETRY HELPERS ──────────────────────────────────
   function getPanelWidth() {
-    // Returns panel's pixel width for fitBounds padding
+    // Returns panel's actual rendered width for fitBounds padding
     if (isMobile()) return 0;
     if (panelEl.classList.contains('is-collapsed')) return 0;
-    return PANEL_WIDTH + PANEL_MARGIN;
+    return panelEl.getBoundingClientRect().width + PANEL_MARGIN;
   }
 
   function fitInView(bounds, opts = {}) {
