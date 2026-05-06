@@ -124,10 +124,10 @@
   let activeSelectionMarker   = null;
   let activeAccordionLayer    = null;
   let activeHoverLayer        = null;
-  let lastSelectionSource     = null;   // 'menu' | 'map' | null
   let activeLastBounds        = null;   // L.LatLngBounds of current selection
   let _flyTimer               = null;
   let _pendingMoveendHandler  = null;
+  let _clickPending           = null;   // accumulates overlapping map click hits via microtask
   // Shared selection state for share link
   let sharePayload            = null;   // { type:'area'|'latlng', value:string }
   let dataLastUpdated         = null;   // filled in from ArcGIS editingInfo on load
@@ -159,7 +159,7 @@
   }
 
   function getFeatureName(props) {
-    return (getVal(props, 'Full_Name') || getVal(props, 'Full_name') || 'Unknown Area').trim();
+    return (getVal(props, 'Full_name') || 'Unknown Area').trim();
   }
 
   // Stable feature ID for deduplication
@@ -257,7 +257,6 @@
 
   function setView(view) {
     panelEl.dataset.view = view;
-    document.getElementById('panel-info-title');  // no-op — just ensure ref
   }
 
   function resetInfoScrollPosition() {
@@ -356,13 +355,13 @@
   // Phase 2 (active):  take control, translateY the panel in real time.
   // On release: snap to nearest of peek / half / full.
   //
-  // Snap Y values (distance from bottom of screen to top of panel):
-  //   peek — panel-header-h + accent border (≈ 60px)
-  //   half — 50dvh
-  //   full — 6dvh (list) or 10dvh (info)
+  // Snap Y values (pixels from top of screen to top of panel):
+  //   peek — innerHeight minus header+grip height (72px on mobile)
+  //   half — 50% of innerHeight
+  //   full — 8% (list) or 12% (info) of innerHeight
   //
-  // We read snap CSS values via getComputedStyle rather than hardcoding
-  // so CSS is the single source of truth.
+  // snapYForState() is the single source of truth for snap positions.
+  // Values must stay in sync with the CSS snap transforms in section 19.
 
   function snapYForState(snap, view) {
     const H  = window.innerHeight;
@@ -581,16 +580,21 @@
     activeAccordionLayer = null;
   }
 
+  // Shared flash helper — brief bright yellow → sustained gold highlight
+  function _applyFlashStyle(layer, base) {
+    layer.setStyle({ color: '#ffe066', weight: 5, opacity: 1, fillOpacity: base.fillOpacity });
+    setTimeout(() => {
+      layer.setStyle({ color: '#ffd60a', weight: Math.max(base.weight + 0.8, 2.2), opacity: 1, fillOpacity: base.fillOpacity });
+    }, 1200);
+  }
+
   function flashLayerBorder(layer) {
     if (!layer || typeof layer.setStyle !== 'function') return;
     const base = getBaseStyle(layer);
     if (activeAccordionLayer && activeAccordionLayer !== layer) clearAccordionSelectionHighlight();
     clearHoverHighlight();
     activeAccordionLayer = layer;
-    layer.setStyle({ color: '#ffe066', weight: 5, opacity: 1, fillOpacity: base.fillOpacity });
-    setTimeout(() => {
-      layer.setStyle({ color: '#ffd60a', weight: Math.max(base.weight + 0.8, 2.2), opacity: 1, fillOpacity: base.fillOpacity });
-    }, 1200);
+    _applyFlashStyle(layer, base);
   }
 
   function flashFeatureByName(areaName) {
@@ -604,7 +608,7 @@
         const base = getBaseStyle(layer);
         layer.setStyle({ color: '#ffe066', weight: 5, opacity: 1, fillOpacity: base.fillOpacity });
         setTimeout(() => {
-          layer.setStyle({ color: '#ffd60a', weight: Math.max(base.weight + 0.8, 2.2), opacity: 1, fillOpacity: base.fillOpacity });
+          _applyFlashStyle(layer, base);
           setTimeout(() => { if (activeAccordionLayer !== layer) layer.setStyle(base); }, 1200);
         }, 300);
       });
@@ -626,7 +630,6 @@
     }
     map.stop();
     activeLastBounds = null;
-    lastSelectionSource = null;
     sharePayload = null;
 
     if (activeSelectionMarker) { map.removeLayer(activeSelectionMarker); activeSelectionMarker = null; }
@@ -982,8 +985,7 @@
   }
 
   function openInfoPanel(latlng, features, options = {}) {
-    lastSelectionSource = options.source || null;
-    activeLastBounds    = options.source === 'menu' ? getBoundsForFeatures(features) : null;
+    activeLastBounds = options.source === 'menu' ? getBoundsForFeatures(features) : null;
 
     const isMulti  = features.length > 1;
     const areaName = getFeatureName(features[0].properties) || 'Area Info';
@@ -1309,21 +1311,21 @@
   async function loadAllFromSingleService() {
     try {
       const [metaResp, dataResp, versionResp] = await Promise.all([
-    fetch(`${SERVICE_LAYER_URL}?f=json`),
-    fetch(`${SERVICE_LAYER_URL}/query?where=1=1&outFields=*&f=geojson&returnGeometry=true`),
-    fetch('version.json').catch(() => null),   // non-fatal if missing
-  ]);
- 
-  // Read app version date (non-fatal if version.json is absent or malformed)
-  if (versionResp?.ok) {
-    try {
-      const versionData = await versionResp.json();
-      if (versionData.appLastUpdated) {
-        const d = new Date(versionData.appLastUpdated + 'T00:00:00Z');
-        window._haMMA_appVersion = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+        fetch(`${SERVICE_LAYER_URL}?f=json`),
+        fetch(`${SERVICE_LAYER_URL}/query?where=1=1&outFields=*&f=geojson&returnGeometry=true`),
+        fetch('version.json').catch(() => null),   // non-fatal if missing
+      ]);
+
+      // Read app version date (non-fatal if version.json is absent or malformed)
+      if (versionResp?.ok) {
+        try {
+          const versionData = await versionResp.json();
+          if (versionData.appLastUpdated) {
+            const d = new Date(versionData.appLastUpdated + 'T00:00:00Z');
+            window._haMMA_appVersion = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+          }
+        } catch { /* malformed version.json — silently ignore */ }
       }
-    } catch { /* malformed version.json — silently ignore */ }
-  }
 
       if (!metaResp.ok || !dataResp.ok) {
         throw new Error(`Service responded with HTTP ${!metaResp.ok ? metaResp.status : dataResp.status}`);
@@ -1390,11 +1392,11 @@
               if (_pendingMoveendHandler) { map.off('moveend', _pendingMoveendHandler); _pendingMoveendHandler = null; }
 
               // Accumulate all overlapping hits, then open once via microtask
-              if (!map._haMMA_clickPending) {
-                map._haMMA_clickPending = { latlng: e.latlng, hits: [] };
+              if (!_clickPending) {
+                _clickPending = { latlng: e.latlng, hits: [] };
                 Promise.resolve().then(() => {
-                  const { latlng, hits } = map._haMMA_clickPending;
-                  map._haMMA_clickPending = null;
+                  const { latlng, hits } = _clickPending;
+                  _clickPending = null;
                   if (!hits.length) { clearMapSelection(); return; }
 
                   if (hits.length === 1) {
@@ -1407,16 +1409,16 @@
               }
 
               // Add this feature if not already in hits
-              if (!map._haMMA_clickPending.hits.some((f) => featureId(f) === featureId(feature))) {
-                map._haMMA_clickPending.hits.push(feature);
+              if (!_clickPending.hits.some((f) => featureId(f) === featureId(feature))) {
+                _clickPending.hits.push(feature);
               }
               // Scan all layers for other hits at this point
               Object.values(allIslandLayers).forEach((grp) => {
                 if (!map.hasLayer(grp)) return;
                 grp.eachLayer((l) => {
                   if (pointInFeatureGeometry(e.latlng, l.feature) &&
-                      !map._haMMA_clickPending.hits.some((f) => featureId(f) === featureId(l.feature))) {
-                    map._haMMA_clickPending.hits.push(l.feature);
+                      !_clickPending.hits.some((f) => featureId(f) === featureId(l.feature))) {
+                    _clickPending.hits.push(l.feature);
                   }
                 });
               });
