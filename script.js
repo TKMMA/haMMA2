@@ -39,6 +39,7 @@
   const PANEL_MARGIN         = 12;    // must match --panel-margin in CSS
   const TRANSITION_MS        = 360;   // must match --dur-slow in CSS (0.36s)
   const MOBILE_MQ            = window.matchMedia('(max-width: 768px)');
+  const REDUCED_MOTION_MQ    = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   const RULES_CATEGORIES = [
     {
@@ -1474,12 +1475,42 @@
     }
   });
 
+  function setSummaryBodyCollapsed(body, shouldCollapse) {
+    if (!body) return;
+    if (REDUCED_MOTION_MQ.matches) {
+      body.classList.toggle('is-closed', shouldCollapse);
+      body.style.maxHeight = shouldCollapse ? '0px' : '';
+      return;
+    }
+
+    const currentHeight = `${body.scrollHeight}px`;
+    body.style.maxHeight = currentHeight;
+
+    if (shouldCollapse) {
+      requestAnimationFrame(() => {
+        body.classList.add('is-closed');
+        body.style.maxHeight = '0px';
+      });
+      return;
+    }
+
+    body.classList.remove('is-closed');
+    requestAnimationFrame(() => {
+      body.style.maxHeight = `${body.scrollHeight}px`;
+    });
+    const clear = () => {
+      if (!body.classList.contains('is-closed')) body.style.maxHeight = '';
+      body.removeEventListener('transitionend', clear);
+    };
+    body.addEventListener('transitionend', clear);
+  }
+
   function handleSummaryToggleClick(toggleBtn) {
     const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
     toggleBtn.setAttribute('aria-expanded', String(!isExpanded));
     const body = toggleBtn.closest(UI_SELECTORS.summaryCard)?.querySelector(UI_SELECTORS.summaryBody);
     if (body?.classList.contains('summary-body')) {
-      body.classList.toggle('is-closed', isExpanded);
+      setSummaryBodyCollapsed(body, isExpanded);
     }
     return true;
   }

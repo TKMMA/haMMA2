@@ -837,7 +837,7 @@ a { color: inherit; }
 .summary-body {
   overflow: hidden;
   transition: max-height 0.32s var(--ease-panel), opacity 0.22s ease;
-  max-height: 9999px;
+  max-height: none;
   opacity: 1;
   pointer-events: auto;
 }
@@ -940,6 +940,14 @@ a { color: inherit; }
   background: var(--surface);
 }
 
+
+
+@media (prefers-reduced-motion: reduce) {
+  .summary-body,
+  .summary-card-toggle__chevron {
+    transition: none !important;
+  }
+}
 
 /* ── 18. DESKTOP LAYOUT ─────────────────────────────────────── */
 @media (min-width: 769px) {
