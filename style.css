@@ -880,6 +880,64 @@ a { color: inherit; }
 .about-pane__link { display: inline-block; font-size: 13px; font-weight: 600; color: var(--brand-500); text-decoration: none; }
 .about-pane__link:hover { text-decoration: underline; }
 
+.about-pane__disclaimer {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.55;
+  padding: 10px 12px;
+  background: var(--surface-tint);
+  border-radius: var(--r-sm);
+  border-left: 3px solid var(--border-mid);
+  margin: 0;
+}
+ 
+.about-pane__section--versions {
+  border-top: 1px solid var(--border-light);
+  margin-top: 12px;
+  padding-top: 14px;
+}
+ 
+.about-pane__versions {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+ 
+.about-pane__version-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 12px;
+  padding: 7px 10px;
+  background: var(--surface-tint);
+  border-radius: var(--r-sm);
+}
+ 
+.about-pane__version-label {
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+ 
+.about-pane__version-value {
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 12px;
+  text-align: right;
+}
+ 
+.about-pane__version-note {
+  font-size: 11px;
+  color: var(--text-hint);
+  margin: 0;
+  font-style: italic;
+  line-height: 1.5;
+}
 
 /* ── PANEL VIEW SLIDE ANIMATION ─────────────────────────────── */
 /* Info slides in from right; list slides out to left */
