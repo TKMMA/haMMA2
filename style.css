@@ -999,13 +999,21 @@ a { color: inherit; }
   .panel-collapse-btn { display: flex; }
   .panel-header__grip { display: none !important; }
 
-  /* Desktop scroll container */
+  /* Desktop scroll ownership contract:
+   * - `.info-content` is the only scrolling element in info view.
+   * - Inner wrappers (`.mmpopup`, `.mmpopup__scroll`) stay layout-only.
+   * This prevents wheel/touchpad scroll trapping on nested cards.
+   */
   .info-content {
     overflow-y: auto;
+    overflow-x: hidden;
     overscroll-behavior: contain;
   }
   .mmpopup { min-height: 100%; display: flex; flex-direction: column; }
-  .mmpopup__scroll { min-height: 0; }
+  .mmpopup__scroll {
+    min-height: 0;
+    overflow: visible;
+  }
 
   /* Desktop logos — a bit larger */
   .brand-logo { width: 34px; height: 34px; }
