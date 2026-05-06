@@ -666,17 +666,33 @@ a { color: inherit; }
 
 /* ── 13. SUMMARY CARD LAYOUT ────────────────────────────────── */
 /* Visual styling handled by .mmcard--summary above. Layout only. */
+.summary-card-toggle {
+  width: 100%;
+  display: flex; align-items: center; gap: 8px;
+  background: transparent; border: none;
+  border-bottom: 1px solid var(--border-light);
+  padding: 14px;
+  cursor: pointer; text-align: left;
+}
+.summary-card-toggle:hover { background: rgba(255,255,255,0.45); }
 .summary-card-label {
   display: flex; align-items: center; gap: 8px;
   font-size: 10px; font-weight: 700;
   letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--text-muted); margin-bottom: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  flex: 1;
 }
 .summary-card-label::before {
   content: ''; display: block;
   width: 3px; height: 12px; border-radius: 2px;
   background: var(--border-mid); flex-shrink: 0;
 }
+.summary-card-toggle__chevron {
+  width: 14px; height: 14px; fill: var(--text-muted);
+  opacity: 0.7; transition: transform var(--dur-mid); flex-shrink: 0;
+}
+.summary-card-toggle[aria-expanded="true"] .summary-card-toggle__chevron { transform: rotate(180deg); }
 
 .summary-source-legend__label { font-size: 11px; color: var(--text-muted); margin-bottom: 7px; }
 .summary-source-pills { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
@@ -711,7 +727,10 @@ a { color: inherit; }
 .summary-field-entry { padding: 2px 0; }
 .summary-field-entry__chips { display: none; }
 .rule-item-list--chipped .rule-item {
-  display: flex; align-items: baseline; gap: 6px; justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  column-gap: 6px;
 }
 /* Restore bullet appearance for flex items (disc bullets disappear in flex) */
 .rule-item-list--chipped .rule-item::before {
@@ -724,6 +743,7 @@ a { color: inherit; }
 .rule-item__chips {
   display: inline-flex; gap: 3px; flex-shrink: 0;
   align-items: center; position: relative; top: 1px;
+  justify-self: end;
 }
 .summary-empty { font-size: 12px; color: var(--text-muted); margin: 0; }
 
@@ -750,10 +770,8 @@ a { color: inherit; }
  * Two instances, one CSS component:
  *   .info-banner                 — shared wrapper (amber, full-width)
  *   .info-banner--notice         — overlap notice (static, informational)
- *   .info-banner--toggle         — summary toggle (interactive button)
  *
- * Both are full-width, same amber background, same border, same padding.
- * Difference: notice is a div, toggle is a button. Icon vs chevron.
+ * Banner is full-width and used for static overlap notices.
  */
 
 /* Amber notification tokens */
@@ -797,39 +815,6 @@ a { color: inherit; }
   margin-bottom: 1px;
 }
 
-/* Toggle: the entire banner is the button */
-.info-banner--toggle {
-  cursor: pointer;
-  border: none;
-  font-family: var(--font);
-  text-align: left;
-  transition: background var(--dur-fast);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-.info-banner--toggle:hover { background: #FDE68A; }
-
-/* Toggle label — static, never changes */
-.info-banner__label {
-  flex: 1;
-  font-size: 12px; font-weight: 700;
-  color: var(--banner-text);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-/* Chevron on toggle */
-.info-banner__chevron {
-  width: 14px; height: 14px;
-  fill: var(--banner-text);
-  opacity: 0.6;
-  transition: transform var(--dur-mid);
-  flex-shrink: 0;
-}
-.info-banner--toggle[aria-expanded="true"] .info-banner__chevron {
-  transform: rotate(180deg);
-}
 
 /* Summary body — starts open, collapses */
 .summary-body {

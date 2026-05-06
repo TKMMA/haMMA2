@@ -799,10 +799,15 @@
         </div>`
       : `<p class="summary-empty">No rules on record for these areas.</p>`;
 
-    // Summary always shown expanded (no accordion) — per v3 spec
     return `<div class="mmcard mmcard--summary overlap-summary-card">
-      <div class="mmcard__body overlap-summary-intro">
-        <div class="summary-card-label">Combined rules summary</div>
+      <button class="summary-card-toggle" type="button"
+              aria-expanded="true" data-action="toggle-summary">
+        <span class="summary-card-label">Combined rules for ${features.length} area${features.length===1?'':'s'}</span>
+        <svg class="summary-card-toggle__chevron" viewBox="0 0 256 256" aria-hidden="true">
+          <path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/>
+        </svg>
+      </button>
+      <div class="mmcard__body summary-body">
         <div class="summary-source-legend">
           <div class="summary-source-legend__label">Tap an area to highlight it on the map:</div>
           <div class="summary-source-pills">${legendHtml}</div>
@@ -873,19 +878,9 @@
   }
 
   function renderOverlapInfoPane(features) {
-    const count = features.length;
     return `<div class="mmpopup">
-      <button class="info-banner info-banner--toggle" type="button"
-              aria-expanded="true" data-action="toggle-summary">
-        <span class="info-banner__label">Combined rules for ${count} area${count===1?'':'s'}</span>
-        <svg class="info-banner__chevron" viewBox="0 0 256 256" aria-hidden="true">
-          <path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/>
-        </svg>
-      </button>
-      <div class="summary-body">
-        ${buildSummaryPanel(features)}
-      </div>
       <div class="mmpopup__scroll">
+        ${buildSummaryPanel(features)}
         <section class="area-specific-section" aria-label="Area-specific rules">
           ${features.map((f,i) => buildAreaCard(f,`area-${i}`)).join('')}
         </section>
@@ -1454,7 +1449,7 @@
     if (toggleBtn) {
       const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
       toggleBtn.setAttribute('aria-expanded', String(!isExpanded));
-      const body = toggleBtn.nextElementSibling;
+      const body = toggleBtn.closest('.overlap-summary-card')?.querySelector('.summary-body');
       if (body?.classList.contains('summary-body')) {
         body.classList.toggle('is-closed', isExpanded);
       }
