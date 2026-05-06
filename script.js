@@ -248,6 +248,13 @@
     document.getElementById('panel-info-title');  // no-op — just ensure ref
   }
 
+  function resetInfoScrollPosition() {
+    if (!infoContentEl) return;
+    infoContentEl.scrollTop = 0;
+    const innerScroll = infoContentEl.querySelector('.mmpopup__scroll');
+    if (innerScroll) innerScroll.scrollTop = 0;
+  }
+
   function setSnap(snap) {
     if (!isMobile()) return;
     panelEl.dataset.snap = snap;
@@ -743,6 +750,15 @@
     return { sources, categories };
   }
 
+  // UI contract for overlap-summary rendering/interaction:
+  // - `.info-content` remains the only scroll owner (desktop).
+  // - Overlap summary card must include:
+  //     [data-summary-card] wrapper
+  //     [data-action="toggle-summary"] toggle button
+  //     [data-summary-body] collapsible content block
+  // - Delegated click handler toggles only the nearest summary card body.
+  // Keep these selectors stable when editing markup.
+
   function renderSummaryStatusGroup(statusKey, entries) {
     if (!entries?.length) return '';
     const status = RULE_STATUS[statusKey];
@@ -770,11 +786,18 @@
       ${entriesHtml}</div>`;
   }
 
-  function buildSummaryPanel(features) {
-    const summary  = buildCombinedRulesSummary(features);
-    const hasRules = summary.categories.length > 0;
+  function renderSummaryHeader(areaCount) {
+    return `<button class="summary-card-toggle" type="button"
+              aria-expanded="true" data-action="toggle-summary">
+        <span class="summary-card-label">Combined rules for ${areaCount} area${areaCount===1?'':'s'}</span>
+        <svg class="btn-icon summary-card-toggle__chevron" viewBox="0 0 256 256" aria-hidden="true">
+          <path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/>
+        </svg>
+      </button>`;
+  }
 
-    const legendHtml = summary.sources.map((s) => `
+  function renderSummaryLegend(sources) {
+    const legendHtml = sources.map((s) => `
       <button class="summary-source-pill" type="button"
         data-flash-area="${escapeHtml(s.name)}"
         title="Tap to highlight ${escapeHtml(s.name)} on the map"
@@ -782,27 +805,42 @@
         ${renderSourceChip(s)}
         <span class="summary-source-pill__name">${escapeHtml(s.name)}</span>
       </button>`).join('');
+    return `<div class="summary-source-legend">
+          <div class="summary-source-legend__label">Tap an area to highlight it on the map:</div>
+          <div class="summary-source-pills">${legendHtml}</div>
+        </div>`;
+  }
 
-    const rulesHtml = hasRules
-      ? `<div class="summary-field-stack">${summary.categories.map(({ category, statusMap }) => `
+  function renderSummaryRules(categories) {
+    if (!categories.length) return '<p class="summary-empty">No rules on record for these areas.</p>';
+    return `<div class="summary-field-stack">${categories.map(({ category, statusMap }) => `
           <div class="summary-field-block">
             <div class="summary-section-title">${escapeHtml(category.label)}</div>
             ${Object.entries(statusMap).map(([sk, entries]) => renderSummaryStatusGroup(sk, entries)).join('')}
           </div>`).join('')}
-        </div>`
-      : `<p class="summary-empty">No rules on record for these areas.</p>`;
+        </div>`;
+  }
 
-    // Summary always shown expanded (no accordion) — per v3 spec
-    return `<div class="mmcard mmcard--summary overlap-summary-card">
-      <div class="mmcard__body overlap-summary-intro">
-        <div class="summary-card-label">Combined rules summary</div>
-        <div class="summary-source-legend">
-          <div class="summary-source-legend__label">Tap an area to highlight it on the map:</div>
-          <div class="summary-source-pills">${legendHtml}</div>
-        </div>
-        ${rulesHtml}
+  function buildSummaryPanel(features) {
+    const summary = buildCombinedRulesSummary(features);
+    return `<div class="mmcard mmcard--summary overlap-summary-card" data-summary-card>
+      ${renderSummaryHeader(features.length)}
+      <div class="mmcard__body summary-body" data-summary-body>
+        ${renderSummaryLegend(summary.sources)}
+        ${renderSummaryRules(summary.categories)}
       </div>
     </div>`;
+  }
+
+  function assertOverlapPaneContract() {
+    if (!infoContentEl) return;
+    const card = infoContentEl.querySelector('[data-summary-card]');
+    if (!card) return;
+    const toggle = card.querySelector('[data-action="toggle-summary"]');
+    const body = card.querySelector('[data-summary-body]');
+    if (!toggle || !body) {
+      console.warn('haMMA UI contract mismatch: overlap summary card is missing required selectors.');
+    }
   }
 
   // ── Carousel ─────────────────────────────────────────────────
@@ -866,19 +904,9 @@
   }
 
   function renderOverlapInfoPane(features) {
-    const count = features.length;
     return `<div class="mmpopup">
-      <button class="info-banner info-banner--toggle" type="button"
-              aria-expanded="true" data-action="toggle-summary">
-        <span class="info-banner__label">Combined rules for ${count} area${count===1?'':'s'}</span>
-        <svg class="info-banner__chevron" viewBox="0 0 256 256" aria-hidden="true">
-          <path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/>
-        </svg>
-      </button>
-      <div class="summary-body">
-        ${buildSummaryPanel(features)}
-      </div>
       <div class="mmpopup__scroll">
+        ${buildSummaryPanel(features)}
         <section class="area-specific-section" aria-label="Area-specific rules">
           ${features.map((f,i) => buildAreaCard(f,`area-${i}`)).join('')}
         </section>
@@ -941,6 +969,7 @@
     clearMapSelection();
     setPanelTitle('About');
     infoContentEl.innerHTML = `<div class="mmpopup"><div class="mmpopup__scroll">${README_HTML}</div></div>`;
+    resetInfoScrollPosition();
     openInfoView();
     clearAccordionSelectionHighlight();
     sharePayload = null;
@@ -971,10 +1000,10 @@
     infoContentEl.innerHTML = isMulti
       ? renderOverlapInfoPane(features)
       : renderSingleAreaInfoPane(features[0], overlapCount);
+    if (isMulti) assertOverlapPaneContract();
 
     // Scroll to top
-    const scroll = infoContentEl.querySelector('.mmpopup__scroll');
-    if (scroll) scroll.scrollTop = 0;
+    resetInfoScrollPosition();
 
     // Set header title
     const title = isMulti ? `${count} Area${count===1?'':'s'} Selected` : areaName;
@@ -1447,7 +1476,7 @@
     if (toggleBtn) {
       const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
       toggleBtn.setAttribute('aria-expanded', String(!isExpanded));
-      const body = toggleBtn.nextElementSibling;
+      const body = toggleBtn.closest('[data-summary-card]')?.querySelector('[data-summary-body]');
       if (body?.classList.contains('summary-body')) {
         body.classList.toggle('is-closed', isExpanded);
       }
