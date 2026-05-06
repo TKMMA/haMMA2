@@ -259,13 +259,17 @@
     if (isMobile()) setSnap('half');
   }
 
-  function openListView() {
+  function closeToPeek() {
+    // × button: return to list and minimize panel
     setView('list');
-    if (isMobile()) {
-      // Don't change snap — stay at current height so map doesn't jump
-      panelEl.classList.remove('is-dragging');
-    }
-    // Clear selection state
+    if (isMobile()) setSnap('peek');
+    sharePayload = null;
+  }
+
+  function openListView() {
+    // ← back button: return to list, keep current snap height
+    setView('list');
+    panelEl.classList.remove('is-dragging');
     sharePayload = null;
   }
 
@@ -374,10 +378,11 @@
     // Confirmed vertical — upgrade to active
     document.removeEventListener('touchmove', _passiveDragWatch, { passive: true });
     panelEl.classList.add('is-dragging');
-    // Read current translateY
-    const matrix = new DOMMatrix(getComputedStyle(panelEl).transform);
-    _drag.baseY = matrix.f;
-    _drag.lastY = matrix.f;
+    // Use known snap Y instead of computed style — more reliable at all snap positions
+    const currentSnap = panelEl.dataset.snap || 'half';
+    const currentView = panelEl.dataset.view  || 'list';
+    _drag.baseY = snapYForState(currentSnap, currentView);
+    _drag.lastY = _drag.baseY;
     _drag.lastTime = Date.now();
     document.addEventListener('touchmove', _activeDragMove, { passive: false });
   }
@@ -834,12 +839,13 @@
       ${buildCarousel(images, name)}
       <div class="mmcard__body">
         <h3 class="mmcard__title">${escapeHtml(name)}</h3>
-        <div class="card-meta-links">
-          <button type="button" class="card-meta-link" data-tab-target="about-${uid}">About</button>
-          <button type="button" class="card-meta-link" data-tab-target="sources-${uid}">Sources</button>
+        <div class="mmtabs">
+          <button type="button" data-tab-target="about-${uid}">About</button>
+          <button type="button" data-tab-target="rules-${uid}" class="active">Rules</button>
+          <button type="button" data-tab-target="sources-${uid}">Sources</button>
         </div>
-        <div id="rules-${uid}"   class="tab-pane field-stack">${renderRulesTab(props)}</div>
         <div id="about-${uid}"   class="tab-pane field-stack" hidden>${renderTab('about',props)}</div>
+        <div id="rules-${uid}"   class="tab-pane field-stack">${renderRulesTab(props)}</div>
         <div id="sources-${uid}" class="tab-pane field-stack" hidden>${renderTab('laws',props)}</div>
       </div>
     </div>`;
@@ -863,9 +869,22 @@
   }
 
   function renderOverlapInfoPane(features) {
+    const count = features.length;
+    // Summary starts collapsed — user taps to expand
     return `<div class="mmpopup">
-      <div class="mmpopup__scroll">
+      <button class="summary-toggle-btn" type="button"
+              aria-expanded="false" data-action="toggle-summary">
+        <span class="summary-toggle-pill">
+          Combined rules for ${count} areas
+          <svg class="summary-toggle-chevron" viewBox="0 0 256 256" aria-hidden="true">
+            <path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/>
+          </svg>
+        </span>
+      </button>
+      <div class="summary-body" id="summary-body-${Date.now()}">
         ${buildSummaryPanel(features)}
+      </div>
+      <div class="mmpopup__scroll">
         <section class="overlap-areas area-specific-section" aria-label="Area-specific rules">
           <h4 class="overlap-areas__title">Area-specific rules</h4>
           <p class="overlap-areas__copy">These cards preserve the original rules for each selected area.</p>
@@ -875,31 +894,15 @@
     </div>`;
   }
 
-  // ── Tab switching ─────────────────────────────────────────────
-  // Handles both .card-meta-link buttons (About/Sources) and
-  // any legacy .mmtabs buttons. Rules pane is always visible by default.
+  // ── Tab switching ────────────────────────────────────────────
   function showTab(btn, tabId) {
     const card = btn.closest('.area-section');
     if (!card) return;
-    // Hide all tab panes
     card.querySelectorAll('.tab-pane').forEach((p) => { p.hidden = true; });
-    // Show target
+    card.querySelectorAll('.mmtabs button').forEach((b) => b.classList.remove('active'));
     const target = card.querySelector(`#${CSS.escape(tabId)}`);
     if (target) target.hidden = false;
-    // Update active state on meta links
-    card.querySelectorAll('.card-meta-link').forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
-  }
-
-  // Dismiss meta link active state and restore rules pane
-  function restoreRulesPane(card) {
-    card.querySelectorAll('.tab-pane').forEach((p) => { p.hidden = true; });
-    card.querySelectorAll('.card-meta-link').forEach((b) => b.classList.remove('active'));
-    const uid = card.querySelector('[id^="rules-"]')?.id;
-    if (uid) {
-      const rulesPane = card.querySelector(`#${uid}`);
-      if (rulesPane) rulesPane.hidden = false;
-    }
   }
 
 
@@ -960,7 +963,8 @@
     const count    = features.length;
 
     let overlapCount = 0;
-    if (!isMulti && options.source === 'menu') {
+    if (!isMulti) {
+      // Show overlap notice for both list-selection AND map-tap single hits
       let targetLayer = null;
       Object.values(allIslandLayers).some((group) => {
         group.eachLayer((layer) => {
@@ -1415,7 +1419,7 @@
 
   // Panel header buttons
   document.getElementById('panel-back-btn')?.addEventListener('click', openListView);
-  document.getElementById('panel-close-btn')?.addEventListener('click', openListView);
+  document.getElementById('panel-close-btn')?.addEventListener('click', closeToPeek);
   document.getElementById('panel-share-btn')?.addEventListener('click', shareCurrentSelection);
   document.getElementById('panel-collapse-btn')?.addEventListener('click', collapsePanel);
   document.getElementById('panel-reveal-btn')?.addEventListener('click', expandPanel);
@@ -1435,18 +1439,21 @@
   // Info content — delegated for tabs, flash pills, notices, carousel, summary
   infoContentEl?.addEventListener('click', (e) => {
     const tabBtn = e.target.closest('[data-tab-target]');
-    if (tabBtn) {
-      // If already active, tap again → restore rules pane
-      if (tabBtn.classList.contains('active')) {
-        restoreRulesPane(tabBtn.closest('.area-section'));
-      } else {
-        showTab(tabBtn, tabBtn.dataset.tabTarget);
-      }
-      return;
-    }
+    if (tabBtn) { showTab(tabBtn, tabBtn.dataset.tabTarget); return; }
 
     const flashPill = e.target.closest('[data-flash-area]');
     if (flashPill) { flashFeatureByName(flashPill.dataset.flashArea); return; }
+
+    const toggleBtn = e.target.closest('[data-action="toggle-summary"]');
+    if (toggleBtn) {
+      const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+      toggleBtn.setAttribute('aria-expanded', String(!isExpanded));
+      const body = toggleBtn.nextElementSibling;
+      if (body?.classList.contains('summary-body')) {
+        body.classList.toggle('is-open', !isExpanded);
+      }
+      return;
+    }
 
     const dismiss = e.target.closest('.overlap-notice__dismiss');
     if (dismiss) { dismiss.closest('.overlap-notice')?.remove(); return; }
