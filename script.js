@@ -999,16 +999,10 @@
       updateClickMarker(latlng);
     }
 
-    // Fly to bounds
+    // Fly to bounds — only for list selections, never for map clicks
     if (options.source === 'menu' && activeLastBounds) {
       fitInView(activeLastBounds, { delay: TRANSITION_MS });
     }
-    if (options.source === 'map' && !isMobile() && latlng) {
-      // Desktop: fit bounds around click area with panel padding
-      const bounds = getBoundsForFeatures(features);
-      if (bounds) fitInView(bounds, { maxZoom: 14, delay: 0 });
-    }
-  }
 
 
   // ── 13. SHARE ────────────────────────────────────────────────
