@@ -1,5 +1,8 @@
 /* ============================================================
    haMMA — Hawaii Managed Marine Areas
+   Copyright (c) 2026 Tyler Kueffner
+   All rights reserved. Copying, modification, or distribution of this software is prohibited without the copyright holder's consent.
+
    style.css  |  Full refactor
    Font: Inter (via Google Fonts — import in index.html)
    ============================================================ */
@@ -131,8 +134,8 @@ a {
   z-index: 1;
 }
 
-/* Desktop: pane-stage is not a real layout container */
-.pane-stage { display: contents; }
+/* #sheet is mobile-only — hidden on desktop */
+#sheet { display: none; }
 
 
 /* ── 5. BRAND PANEL ─────────────────────────────────────────── */
@@ -1158,156 +1161,74 @@ a {
 
 
 /* ── 18. MOBILE — BOTTOM SHEET LAYOUT ───────────────────────── */
+/*
+ * Architecture: one #sheet element slides vertically only.
+ * No horizontal translation. Panel switching is show/hide via
+ * [data-view] attribute — the CSS controls which .sheet__panel
+ * is visible. Zero X-axis complexity.
+ *
+ * States (set by JS as data-snap attribute):
+ *   hidden   — sheet peeks at top of banner only
+ *   open     — half height (default)
+ *   full     — near full height (22dvh top for info, 3dvh for list)
+ *
+ * The desktop map-sidebar and info-sidebar are hidden on mobile.
+ * The #sheet contains its own duplicate list + info panels.
+ */
+
+/* Hide desktop panels on mobile */
 @media (max-width: 768px) {
 
-  /* ── Pane stage ─────────────────────────────────────────────── */
-  .pane-stage {
+  :root {
+    --sheet-banner-h: 58px;
+    --sheet-tab-h:    22px;
+  }
+
+  /* Desktop panels hidden on mobile — #sheet takes over */
+  .map-sidebar,
+  .info-sidebar { display: none !important; }
+
+  /* ── THE SHEET ───────────────────────────────────────────────── */
+  #sheet {
     position: fixed;
     bottom: 0;
     left: 0;
-    width: 200vw;
-    height: 92dvh;
-    display: flex;
-    gap: 0;
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--browser-offset, 0px));
-    --stage-x: 0;
-    --stage-y: calc(50dvh - var(--sheet-banner-h));
-    transform: translate(var(--stage-x), var(--stage-y));
-    transition: transform var(--duration-slow) var(--ease-panel);
-    will-change: transform;
-    z-index: 1005;
-    pointer-events: none;
-  }
-
-  .pane-stage.is-dragging { transition: none !important; }
-
-  /* sheet-banner-h is now the height of the brand panel / info header */
-  :root { --sheet-banner-h: 58px; --sheet-tab-h: 22px; }
-
-  .pane-stage.is-hidden   { --stage-y: calc(92dvh - var(--sheet-banner-h)); }
-  .pane-stage.is-open     { --stage-y: calc(50dvh - var(--sheet-banner-h)); }
-  .pane-stage.is-full     { --stage-y: calc(8dvh); }
-  .pane-stage.is-info-view { --stage-x: -100vw; }
-
-  /* ── Individual panels ──────────────────────────────── */
-  .map-sidebar,
-  .info-sidebar {
-    position: relative;
     width: 100vw;
-    flex: 0 0 100vw;
-    height: 92dvh;
-    max-height: 92dvh;
-    top: auto;
-    left: auto;
-    margin: 0;
-    transform: none;
+    /* Sheet height: fills from snap point to bottom of screen.
+       We translate Y to show/hide it — content height is always full. */
+    height: calc(100dvh - var(--sheet-tab-h));
+    background: var(--color-surface-base);
     border-radius: 0;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.18);
-    pointer-events: auto;
-    z-index: 1;
-    transition: none;
-    overflow: visible;
-  }
-
-  /* Clip the scrollable content area, not the whole panel */
-  .map-sidebar .sidebar-search-wrap,
-  .info-sidebar .info-content { overflow: hidden; }
-
-  .map-sidebar .island-list {
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  /* Scroll containment — both panels fill their visible strip and scroll within it */
-  .map-sidebar {
+    z-index: 1005;
     display: flex;
     flex-direction: column;
+    overflow: visible; /* allow drag tab to protrude above */
+    /* Default Y = open (half height) */
+    transform: translateY(calc(50dvh - var(--sheet-banner-h)));
+    transition: transform var(--duration-slow) var(--ease-panel);
+    will-change: transform;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--browser-offset, 0px));
   }
 
-  .map-sidebar .island-list {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+  #sheet.is-dragging { transition: none !important; }
+
+  /* Snap positions — Y transform values */
+  #sheet[data-snap="hidden"] {
+    transform: translateY(calc(100dvh - var(--sheet-banner-h) - var(--sheet-tab-h)));
+  }
+  #sheet[data-snap="open"] {
+    transform: translateY(calc(50dvh - var(--sheet-banner-h)));
+  }
+  #sheet[data-snap="full"][data-view="list"] {
+    transform: translateY(3dvh);
+  }
+  #sheet[data-snap="full"][data-view="info"] {
+    transform: translateY(22dvh);
   }
 
-  .info-sidebar {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .info-sidebar .info-content {
-    flex: 1;
-    min-height: 0;
-    /* Single scroll container for all info panel content on mobile.
-       mmpopup and mmpopup__scroll are normal flow children — they
-       never clip or scroll themselves. */
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-  }
-
-  /* mmpopup fills content naturally — no fixed height */
-  .info-sidebar .info-content .mmpopup {
-    min-height: 100%;
-  }
-
-  /* mmpopup__scroll on mobile: not a scroll container, just flow */
-  .info-sidebar .info-content .mmpopup__scroll {
-    overflow: visible;
-  }
-
-  /* Desktop info-panel-header hidden on mobile */
-  .info-sidebar .info-panel-header { display: none; }
-
-  /* Collapsed list — search and list hidden, only brand panel visible */
-  .map-sidebar.is-collapsed .sidebar-search-wrap,
-  .map-sidebar.is-collapsed .island-list { display: none; }
-
-  /* Info sidebar invisible when not active */
-  .info-sidebar.is-offscreen {
-    visibility: hidden;
-    pointer-events: none;
-  }
-
-  /* ── Mobile font size bumps ── */
-  /* List pane */
-  .area-item        { font-size: 14px; }
-  .island-header    { font-size: 13px; }
-
-  /* Info pane — cards, rules, tabs */
-  .mmcard__title    { font-size: 18px; }
-  .tab-label        { font-size: 12px; }
-  .rule-item        { font-size: 13px; }
-  .field-label      { font-size: 12px; }
-  .field-value      { font-size: 13px; }
-  .rules-category__title { font-size: 12px; }
-  .overlap-notice__text  { font-size: 13px; }
-  .summary-source-pill__name { font-size: 13px; }
-
-  /* Safe-area scroll padding — on mobile the actual scroll containers
-     are info-content and island-list, not mmpopup__scroll */
-  .info-sidebar .info-content,
-  .island-list {
-    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px) + var(--browser-offset, 0px));
-  }
-
-  /* ── Brand panel as drag surface (list side) ─────────── */
-  .brand-panel {
-    width: 100%;
-    border-radius: 0;
-    padding: 0;
-    height: var(--sheet-banner-h);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    position: relative;
-    overflow: visible;
-  }
-
-  /* Drag zone is only the protruding tab — brand header row is never covered */
-  .brand-panel .sheet-banner__drag-zone {
+  /* ── Drag tab — protrudes above the sheet ─────────────────── */
+  .sheet__drag-tab {
     position: absolute;
     top: calc(-1 * var(--sheet-tab-h));
     left: 50%;
@@ -1325,85 +1246,74 @@ a {
     cursor: grab;
   }
 
-  .brand-panel .sheet-banner__drag-zone:active { cursor: grabbing; }
+  .sheet__drag-tab:active { cursor: grabbing; }
 
-  .brand-panel .sheet-banner__grip {
-    position: relative;
-    z-index: 1;
+  .sheet__grip {
+    width: 28px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.5);
   }
 
-  /* Logos row */
-  .brand-panel .brand-header {
-    position: relative;
-    z-index: 1;
-    padding: 6px 12px;
-    pointer-events: none;
-  }
-
-  .brand-logo { width: 26px; height: 26px; }
-  .brand-title-main { font-size: 12px; }
-
-  /* ── Info mobile header (gradient, same height as brand panel) ── */
-  .info-mobile-header {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+  .sheet__grip::after {
+    content: '';
+    display: block;
+    margin-top: 5px;
     width: 100%;
-    height: var(--sheet-banner-h);
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.28);
+  }
+
+  /* ── Panels inside the sheet ──────────────────────────────── */
+  .sheet__panel {
+    display: none; /* hidden by default */
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* Show the panel that matches data-view */
+  #sheet[data-view="list"]  .sheet__panel--list { display: flex; }
+  #sheet[data-view="info"]  .sheet__panel--info { display: flex; }
+
+  /* ── List panel banner ────────────────────────────────────── */
+  .sheet__banner--list {
     flex-shrink: 0;
+    height: var(--sheet-banner-h);
     background: linear-gradient(135deg, var(--color-brand-darkest), var(--color-brand-mid));
-    position: relative;
-    overflow: visible;
-  }
-
-  /* Drag zone is only the protruding tab — back button row is never covered */
-  /* Summary banner and overlap notice on mobile — just flow normally.
-     No sticky needed since info-content is the scroll container and
-     the banner sits at the top of the content naturally. */
-  .mmpopup__summary-banner__cta {
-    align-items: center;
-    padding: 8px 14px;
-  }
-
-  .info-mobile-header .sheet-banner__drag-zone {
-    position: absolute;
-    top: calc(-1 * var(--sheet-tab-h));
-    left: 50%;
-    transform: translateX(-50%);
-    width: 64px;
-    height: var(--sheet-tab-h);
     display: flex;
     align-items: center;
-    justify-content: center;
-    background: var(--color-brand-darkest);
-    border-radius: 10px 10px 0 0;
-    box-shadow: -2px -3px 6px rgba(0,0,0,0.18);
-    z-index: 2;
-    touch-action: none;
-    cursor: grab;
   }
 
-  .info-mobile-header .sheet-banner__drag-zone:active { cursor: grabbing; }
-
-  .info-mobile-header .sheet-banner__grip {
-    position: relative;
-    z-index: 1;
+  .sheet__banner--list .brand-header {
+    padding: 6px 12px;
+    width: 100%;
   }
 
-  /* Back / title row — full height, always tappable */
-  .info-mobile-header__row {
+  .sheet__banner--list .brand-logo   { width: 26px; height: 26px; }
+  .sheet__banner--list .brand-title-main { font-size: 12px; }
+
+  /* ── Info panel banner ────────────────────────────────────── */
+  .sheet__banner--info {
+    flex-shrink: 0;
+    height: var(--sheet-banner-h);
+    background: linear-gradient(135deg, var(--color-brand-darkest), var(--color-brand-mid));
     display: flex;
     align-items: center;
+  }
+
+  .sheet__banner-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
     padding: 0 4px;
     gap: 4px;
-    flex: 1;
     position: relative;
-    z-index: 1;
   }
 
-  .info-mobile-header__back {
-    position: relative;
-    z-index: 10;
+  .sheet__back-btn {
     touch-action: manipulation;
     flex-shrink: 0;
     border: none;
@@ -1418,11 +1328,13 @@ a {
     height: 32px;
     display: flex;
     align-items: center;
+    z-index: 10;
+    position: relative;
   }
 
-  .info-mobile-header__back:hover { color: #fff; }
+  .sheet__back-btn:hover { color: #fff; }
 
-  .info-mobile-header__title {
+  .sheet__banner-title {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
@@ -1438,23 +1350,58 @@ a {
     max-width: 55%;
   }
 
-  /* Grip lines */
-  .sheet-banner__grip {
-    width: 28px;
-    height: 3px;
-    border-radius: 2px;
-    background: rgba(255,255,255,0.5);
+  /* ── Search bar inside sheet list panel ──────────────────── */
+  .sheet__search {
     flex-shrink: 0;
   }
 
-  .sheet-banner__grip::after {
-    content: '';
-    display: block;
-    margin-top: 5px;
-    width: 100%;
-    height: 3px;
-    border-radius: 2px;
-    background: rgba(255,255,255,0.28);
+  /* ── Island list inside sheet ────────────────────────────── */
+  .sheet__panel--list .island-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px) + var(--browser-offset, 0px));
+  }
+
+  /* ── Info content inside sheet ───────────────────────────── */
+  .sheet__panel--info .info-content {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px) + var(--browser-offset, 0px));
+  }
+
+  /* mmpopup fills content naturally on mobile */
+  .sheet__panel--info .info-content .mmpopup {
+    min-height: 100%;
+  }
+
+  /* mmpopup__scroll on mobile: not a scroll container, just flow */
+  .sheet__panel--info .info-content .mmpopup__scroll {
+    overflow: visible;
+  }
+
+  /* Collapsed list — search hidden when sheet is hidden/peeking */
+  #sheet[data-snap="hidden"] .sheet__search,
+  #sheet[data-snap="hidden"] .island-list { display: none; }
+
+  /* ── Mobile font size bumps ── */
+  .area-item        { font-size: 14px; }
+  .island-header    { font-size: 13px; }
+  .mmcard__title    { font-size: 18px; }
+  .rule-item        { font-size: 13px; }
+  .rules-category__title { font-size: 12px; }
+  .overlap-notice__text  { font-size: 13px; }
+  .summary-source-pill__name { font-size: 13px; }
+
+  /* Summary banner alignment on mobile */
+  .mmpopup__summary-banner__cta {
+    align-items: center;
+    padding: 8px 14px;
   }
 
   .leaflet-control-zoom { display: none !important; }
@@ -1508,9 +1455,7 @@ a {
 [hidden] { display: none !important; }
 
 
-@media (max-width: 768px) {
-  .info-sidebar > .brand-panel--info { display: none; }
-}
+
 
 /* ── STRUCTURED RULES RENDERING ─────────────────────────────── */
 
