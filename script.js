@@ -139,6 +139,14 @@
   const searchClearEl  = document.getElementById('search-clear-btn');
   const shareToastEl   = document.getElementById('share-toast');
 
+  const UI_SELECTORS = {
+    tabTarget: '[data-tab-target]',
+    flashArea: '[data-flash-area]',
+    summaryToggle: '[data-action="toggle-summary"]',
+    summaryCard: '[data-summary-card]',
+    summaryBody: '[data-summary-body]',
+  };
+
 
   // ── 4. UTILITIES ─────────────────────────────────────────────
   function getVal(props, key) {
@@ -836,8 +844,8 @@
     if (!infoContentEl) return;
     const card = infoContentEl.querySelector('[data-summary-card]');
     if (!card) return;
-    const toggle = card.querySelector('[data-action="toggle-summary"]');
-    const body = card.querySelector('[data-summary-body]');
+    const toggle = card.querySelector(UI_SELECTORS.summaryToggle);
+    const body = card.querySelector(UI_SELECTORS.summaryBody);
     if (!toggle || !body) {
       console.warn('haMMA UI contract mismatch: overlap summary card is missing required selectors.');
     }
@@ -1464,24 +1472,36 @@
     }
   });
 
+  function handleSummaryToggleClick(toggleBtn) {
+    const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+    toggleBtn.setAttribute('aria-expanded', String(!isExpanded));
+    const body = toggleBtn.closest(UI_SELECTORS.summaryCard)?.querySelector(UI_SELECTORS.summaryBody);
+    if (body?.classList.contains('summary-body')) {
+      body.classList.toggle('is-closed', isExpanded);
+    }
+    return true;
+  }
+
+  function handleSummaryFlashClick(flashPill) {
+    flashFeatureByName(flashPill.dataset.flashArea);
+    return true;
+  }
+
+  function handleCardTabClick(tabBtn) {
+    showTab(tabBtn, tabBtn.dataset.tabTarget);
+    return true;
+  }
+
   // Info content — delegated for tabs, flash pills, notices, carousel, summary
   infoContentEl?.addEventListener('click', (e) => {
-    const tabBtn = e.target.closest('[data-tab-target]');
-    if (tabBtn) { showTab(tabBtn, tabBtn.dataset.tabTarget); return; }
+    const tabBtn = e.target.closest(UI_SELECTORS.tabTarget);
+    if (tabBtn && handleCardTabClick(tabBtn)) return;
 
-    const flashPill = e.target.closest('[data-flash-area]');
-    if (flashPill) { flashFeatureByName(flashPill.dataset.flashArea); return; }
+    const flashPill = e.target.closest(UI_SELECTORS.flashArea);
+    if (flashPill && handleSummaryFlashClick(flashPill)) return;
 
-    const toggleBtn = e.target.closest('[data-action="toggle-summary"]');
-    if (toggleBtn) {
-      const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
-      toggleBtn.setAttribute('aria-expanded', String(!isExpanded));
-      const body = toggleBtn.closest('[data-summary-card]')?.querySelector('[data-summary-body]');
-      if (body?.classList.contains('summary-body')) {
-        body.classList.toggle('is-closed', isExpanded);
-      }
-      return;
-    }
+    const toggleBtn = e.target.closest(UI_SELECTORS.summaryToggle);
+    if (toggleBtn && handleSummaryToggleClick(toggleBtn)) return;
 
     const navBtn = e.target.closest('.mmcard__image-nav');
     if (navBtn) {
