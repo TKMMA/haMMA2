@@ -130,7 +130,7 @@
   let _pendingMoveendHandler  = null;
   // Shared selection state for share link
   let sharePayload            = null;   // { type:'area'|'latlng', value:string }
-
+  let dataLastUpdated         = null;   // filled in from ArcGIS editingInfo on load
 
   // ── 3. DOM REFERENCES ────────────────────────────────────────
   const panelEl        = document.getElementById('panel');
@@ -980,8 +980,35 @@
   function openAboutPane() {
     clearMapSelection();
     setPanelTitle('About');
-    infoContentEl.innerHTML = `<div class="mmpopup"><div class="mmpopup__scroll">${README_HTML}</div></div>`;
-    resetInfoScrollPosition();
+ 
+    // Read content from the <template id="about-content"> in index.html
+    const tmpl = document.getElementById('about-content');
+    const content = tmpl
+      ? tmpl.content.cloneNode(true)
+      : null;
+ 
+    if (content) {
+      // Inject app last-updated from version.json (loaded at boot)
+      const appSpan = content.querySelector('[data-app-updated]');
+      if (appSpan) appSpan.textContent = window._haMMA_appVersion ?? '—';
+ 
+      // Inject data last-updated from ArcGIS editingInfo
+      const dataSpan = content.querySelector('[data-data-updated]');
+      if (dataSpan) dataSpan.textContent = dataLastUpdated ?? '—';
+ 
+      const wrapper = document.createElement('div');
+      wrapper.className = 'mmpopup';
+      const scroll = document.createElement('div');
+      scroll.className = 'mmpopup__scroll';
+      scroll.appendChild(content);
+      wrapper.appendChild(scroll);
+      infoContentEl.innerHTML = '';
+      infoContentEl.appendChild(wrapper);
+    } else {
+      // Fallback if template is missing
+      infoContentEl.innerHTML = '<div class="mmpopup"><div class="mmpopup__scroll"><p style="padding:16px">About content unavailable.</p></div></div>';
+    }
+ 
     openInfoView();
     clearAccordionSelectionHighlight();
     sharePayload = null;
@@ -1314,10 +1341,22 @@
   // ── 15. DATA LOADING ─────────────────────────────────────────
   async function loadAllFromSingleService() {
     try {
-      const [metaResp, dataResp] = await Promise.all([
-        fetch(`${SERVICE_LAYER_URL}?f=json`),
-        fetch(`${SERVICE_LAYER_URL}/query?where=1=1&outFields=*&f=geojson&returnGeometry=true`),
-      ]);
+      const [metaResp, dataResp, versionResp] = await Promise.all([
+    fetch(`${SERVICE_LAYER_URL}?f=json`),
+    fetch(`${SERVICE_LAYER_URL}/query?where=1=1&outFields=*&f=geojson&returnGeometry=true`),
+    fetch('version.json').catch(() => null),   // non-fatal if missing
+  ]);
+ 
+  // Read app version date (non-fatal if version.json is absent or malformed)
+  if (versionResp?.ok) {
+    try {
+      const versionData = await versionResp.json();
+      if (versionData.appLastUpdated) {
+        const d = new Date(versionData.appLastUpdated + 'T00:00:00Z');
+        window._haMMA_appVersion = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+      }
+    } catch { /* malformed version.json — silently ignore */ }
+  }
 
       if (!metaResp.ok || !dataResp.ok) {
         throw new Error(`Service responded with HTTP ${!metaResp.ok ? metaResp.status : dataResp.status}`);
@@ -1331,7 +1370,10 @@
       if (!geojson.features) {
         throw new Error('ArcGIS returned no features array — service may be unavailable or schema changed');
       }
-
+      
+      const editDate = metadata?.editingInfo?.dataLastEditDate;
+      if (editDate) dataLastUpdated = new Date(editDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+      
       const renderer      = metadata?.drawingInfo?.renderer;
       const globalOpacity = (100 - (metadata?.drawingInfo?.transparency || 0)) / 100;
 
