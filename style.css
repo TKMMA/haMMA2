@@ -80,6 +80,10 @@
   --r-md:   10px;
   --r-lg:   var(--panel-radius);
   --r-pill: 999px;
+
+  /* Summary rhythm */
+  --summary-pad: 14px;
+  --summary-gap: 10px;
 }
 
 /* ── Mobile dark-panel token overrides ─────────────────────── */
@@ -666,20 +670,44 @@ a { color: inherit; }
 
 /* ── 13. SUMMARY CARD LAYOUT ────────────────────────────────── */
 /* Visual styling handled by .mmcard--summary above. Layout only. */
+/* Contract selectors used by JS: [data-summary-card], [data-summary-body], [data-action="toggle-summary"] */
+.summary-card-toggle {
+  width: 100%;
+  display: flex; align-items: center; gap: 8px;
+  background: transparent; border: none;
+  border-bottom: 1px solid var(--border-light);
+  padding: var(--summary-pad);
+  cursor: pointer; text-align: left;
+}
+.summary-card-toggle:hover { background: rgba(255,255,255,0.52); }
 .summary-card-label {
   display: flex; align-items: center; gap: 8px;
   font-size: 10px; font-weight: 700;
   letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--text-muted); margin-bottom: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  flex: 1;
 }
 .summary-card-label::before {
   content: ''; display: block;
   width: 3px; height: 12px; border-radius: 2px;
   background: var(--border-mid); flex-shrink: 0;
 }
+.summary-card-toggle__chevron {
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px;
+  min-height: 14px;
+  color: var(--text-muted);
+  fill: currentColor;
+  opacity: 0.7;
+  transition: transform var(--dur-mid);
+  flex-shrink: 0;
+}
+.summary-card-toggle[aria-expanded="true"] .summary-card-toggle__chevron { transform: rotate(180deg); }
 
 .summary-source-legend__label { font-size: 11px; color: var(--text-muted); margin-bottom: 7px; }
-.summary-source-pills { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.summary-source-pills { display: flex; flex-direction: column; gap: 6px; margin-bottom: var(--summary-gap); }
 .summary-source-pill {
   display: flex; align-items: center; gap: 8px;
   background: var(--surface-tint);
@@ -695,7 +723,7 @@ a { color: inherit; }
 }
 .summary-source-pill__name { font-size: 12px; font-weight: 500; color: var(--text-secondary); line-height: 1.3; flex: 1; }
 
-.summary-field-stack { display: grid; gap: 12px; }
+.summary-field-stack { display: grid; gap: var(--summary-gap); }
 .summary-field-block { border-radius: var(--r-sm); }
 
 .summary-section-title {
@@ -705,13 +733,18 @@ a { color: inherit; }
   border-bottom: 1px solid var(--border-light);
 }
 
-.summary-status-group { margin-bottom: 8px; }
+.summary-status-group { margin-bottom: 10px; }
 .summary-status-group:last-child { margin-bottom: 0; }
 
 .summary-field-entry { padding: 2px 0; }
 .summary-field-entry__chips { display: none; }
+.summary-field-entry .rule-item-list--chipped {
+  padding: 4px 8px 4px 18px;
+}
 .rule-item-list--chipped .rule-item {
-  display: flex; align-items: baseline; gap: 6px; justify-content: space-between;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
 }
 /* Restore bullet appearance for flex items (disc bullets disappear in flex) */
 .rule-item-list--chipped .rule-item::before {
@@ -724,6 +757,7 @@ a { color: inherit; }
 .rule-item__chips {
   display: inline-flex; gap: 3px; flex-shrink: 0;
   align-items: center; position: relative; top: 1px;
+  margin-left: auto;
 }
 .summary-empty { font-size: 12px; color: var(--text-muted); margin: 0; }
 
@@ -750,10 +784,8 @@ a { color: inherit; }
  * Two instances, one CSS component:
  *   .info-banner                 — shared wrapper (amber, full-width)
  *   .info-banner--notice         — overlap notice (static, informational)
- *   .info-banner--toggle         — summary toggle (interactive button)
  *
- * Both are full-width, same amber background, same border, same padding.
- * Difference: notice is a div, toggle is a button. Icon vs chevron.
+ * Banner is full-width and used for static overlap notices.
  */
 
 /* Amber notification tokens */
@@ -797,39 +829,6 @@ a { color: inherit; }
   margin-bottom: 1px;
 }
 
-/* Toggle: the entire banner is the button */
-.info-banner--toggle {
-  cursor: pointer;
-  border: none;
-  font-family: var(--font);
-  text-align: left;
-  transition: background var(--dur-fast);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-.info-banner--toggle:hover { background: #FDE68A; }
-
-/* Toggle label — static, never changes */
-.info-banner__label {
-  flex: 1;
-  font-size: 12px; font-weight: 700;
-  color: var(--banner-text);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-/* Chevron on toggle */
-.info-banner__chevron {
-  width: 14px; height: 14px;
-  fill: var(--banner-text);
-  opacity: 0.6;
-  transition: transform var(--dur-mid);
-  flex-shrink: 0;
-}
-.info-banner--toggle[aria-expanded="true"] .info-banner__chevron {
-  transform: rotate(180deg);
-}
 
 /* Summary body — starts open, collapses */
 .summary-body {
@@ -918,41 +917,7 @@ a { color: inherit; }
 .tab-pane { font-size: 13px; line-height: 1.6; color: var(--text-primary); }
 
 
-/* ── UNIFIED STATUS PILLS (area cards + summary) ────────────── */
-/* Replaces the old rule-status-block left-border pattern on cards */
-/* Both contexts now use the same pill shape */
-.rule-status-block {
-  margin-bottom: 5px; border-radius: var(--r-sm); overflow: hidden;
-}
-.rule-status-block:last-child { margin-bottom: 0; }
-
-.rule-status-block__header {
-  display: inline-flex; align-items: center;
-  font-size: 10px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.06em;
-  padding: 3px 10px;
-  border-radius: var(--r-pill);
-  margin-bottom: 4px;
-}
-
-/* Light context pills */
-.rule-status--prohibited .rule-status-block__header {
-  background: var(--status-prohibited-bg);
-  color: var(--status-prohibited);
-}
-.rule-status--allowed .rule-status-block__header {
-  background: var(--status-allowed-bg);
-  color: var(--status-allowed);
-}
-.rule-status--limited .rule-status-block__header {
-  background: var(--status-limited-bg);
-  color: var(--status-limited);
-}
-.rule-status--notes .rule-status-block__header {
-  background: var(--status-notes-bg);
-  color: var(--text-secondary);
-}
-
+/* Status pill styles are defined above in section 12 and shared by cards + summary. */
 
 /* ── 17. SHARE TOAST ────────────────────────────────────────── */
 .share-toast {
@@ -999,15 +964,21 @@ a { color: inherit; }
   .panel-collapse-btn { display: flex; }
   .panel-header__grip { display: none !important; }
 
-  /* Desktop scroll container */
-  .info-content { overflow: hidden; }
-  .mmpopup { height: 100%; overflow: hidden; display: flex; flex-direction: column; }
-  .mmpopup__scroll {
-    flex: 1; min-height: 0;
-    overflow-y: auto; overflow-x: hidden;
+  /* Desktop scroll ownership contract:
+   * - `.info-content` is the only scrolling element in info view.
+   * - Inner wrappers (`.mmpopup`, `.mmpopup__scroll`) stay layout-only.
+   * This prevents wheel/touchpad scroll trapping on nested cards.
+   */
+  .info-content {
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
   }
-  .mmpopup__scroll::-webkit-scrollbar { width: 3px; }
-  .mmpopup__scroll::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: var(--r-pill); }
+  .mmpopup { min-height: 100%; display: flex; flex-direction: column; }
+  .mmpopup__scroll {
+    min-height: 0;
+    overflow: visible;
+  }
 
   /* Desktop logos — a bit larger */
   .brand-logo { width: 34px; height: 34px; }
