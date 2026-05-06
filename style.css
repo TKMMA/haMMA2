@@ -80,6 +80,10 @@
   --r-md:   10px;
   --r-lg:   var(--panel-radius);
   --r-pill: 999px;
+
+  /* Summary rhythm */
+  --summary-pad: 14px;
+  --summary-gap: 10px;
 }
 
 /* ── Mobile dark-panel token overrides ─────────────────────── */
@@ -672,10 +676,10 @@ a { color: inherit; }
   display: flex; align-items: center; gap: 8px;
   background: transparent; border: none;
   border-bottom: 1px solid var(--border-light);
-  padding: 14px;
+  padding: var(--summary-pad);
   cursor: pointer; text-align: left;
 }
-.summary-card-toggle:hover { background: rgba(255,255,255,0.45); }
+.summary-card-toggle:hover { background: rgba(255,255,255,0.52); }
 .summary-card-label {
   display: flex; align-items: center; gap: 8px;
   font-size: 10px; font-weight: 700;
@@ -703,7 +707,7 @@ a { color: inherit; }
 .summary-card-toggle[aria-expanded="true"] .summary-card-toggle__chevron { transform: rotate(180deg); }
 
 .summary-source-legend__label { font-size: 11px; color: var(--text-muted); margin-bottom: 7px; }
-.summary-source-pills { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.summary-source-pills { display: flex; flex-direction: column; gap: 6px; margin-bottom: var(--summary-gap); }
 .summary-source-pill {
   display: flex; align-items: center; gap: 8px;
   background: var(--surface-tint);
@@ -719,7 +723,7 @@ a { color: inherit; }
 }
 .summary-source-pill__name { font-size: 12px; font-weight: 500; color: var(--text-secondary); line-height: 1.3; flex: 1; }
 
-.summary-field-stack { display: grid; gap: 12px; }
+.summary-field-stack { display: grid; gap: var(--summary-gap); }
 .summary-field-block { border-radius: var(--r-sm); }
 
 .summary-section-title {
@@ -729,11 +733,14 @@ a { color: inherit; }
   border-bottom: 1px solid var(--border-light);
 }
 
-.summary-status-group { margin-bottom: 8px; }
+.summary-status-group { margin-bottom: 10px; }
 .summary-status-group:last-child { margin-bottom: 0; }
 
 .summary-field-entry { padding: 2px 0; }
 .summary-field-entry__chips { display: none; }
+.summary-field-entry .rule-item-list--chipped {
+  padding: 4px 8px 4px 18px;
+}
 .rule-item-list--chipped .rule-item {
   display: flex;
   align-items: flex-start;
