@@ -21,96 +21,94 @@
   <div class="map-interface">
 
     <!--
-      DESKTOP: map-sidebar and info-sidebar are absolutely-positioned panels
-               floating over the map — no sheet wrapper needed.
-      MOBILE:  #sheet is the single bottom sheet. data-view="list" or "info"
-               controls which panel is visible inside it — no horizontal sliding.
+      Single-DOM architecture — #island-list, #info-content, #area-search
+      exist exactly once. CSS repositions them between desktop panels and
+      the mobile bottom sheet via the .map-interface__panels wrapper.
+
+      DESKTOP: .map-sidebar and .info-sidebar float over the map.
+      MOBILE:  .map-sidebar becomes the bottom sheet (translateY driven by
+               data-snap + is-expanded). data-view="list"|"info" on
+               .map-interface__panels shows the correct aside.
     -->
 
-    <!-- Desktop-only: areas list panel (position: absolute over map) -->
-    <aside id="map-sidebar" class="map-sidebar sheet-panel" role="complementary" aria-label="Marine and freshwater areas list">
-      <header class="brand-panel" id="brand-panel" role="banner">
-        <div class="brand-header brand-header--compact">
-          <img class="brand-logo" src="https://devdar.rapidteksolutions.com/wp-content/themes/react-ts-theme/assets/img/logo-dar.png" alt="Division of Aquatic Resources logo" width="36" height="36" />
-          <div class="brand-title-block"><h1 class="brand-title-main">Managed Areas</h1></div>
-          <img class="brand-logo" src="https://devdar.rapidteksolutions.com/wp-content/themes/react-ts-theme/assets/img/logo-state-of-hawai.png" alt="State of Hawaiʻi logo" width="36" height="36" />
-        </div>
-      </header>
+    <div class="map-interface__panels" id="panels" data-view="list">
 
-      <div class="sidebar-search-wrap">
-        <div class="search-input-wrapper">
-          <label for="area-search" class="sr-only">Search marine and freshwater areas</label>
-          <input type="text" id="area-search" placeholder="Search areas…" autocomplete="off" spellcheck="false" aria-controls="island-list" />
-          <button class="search-clear-btn" type="button" aria-label="Clear search" id="search-clear-btn">✕</button>
-          <span class="search-icon" aria-hidden="true">🔍</span>
-        </div>
-      </div>
+      <!-- ── LIST PANEL ─────────────────────────────────────── -->
+      <aside id="map-sidebar" class="map-sidebar" role="complementary"
+             aria-label="Marine and freshwater areas list">
 
-      <div id="island-list" class="island-list" role="list" aria-label="Areas grouped by island" aria-live="polite" aria-busy="true">
-        <div id="loading-notice" class="loading-notice" role="status">Loading marine areas…</div>
-      </div>
-    </aside>
-
-    <!-- Desktop-only: info panel (position: absolute over map) -->
-    <aside id="info-sidebar" class="info-sidebar sheet-panel" role="region" aria-label="Area details" aria-live="polite">
-      <div class="info-panel-header" id="info-panel-header">
-        <span class="info-panel-header__title" id="info-banner-title" aria-live="polite">Area Info</span>
-      </div>
-      <div id="info-content" class="info-content"></div>
-    </aside>
-
-    <!--
-      MOBILE ONLY: Single bottom sheet.
-      - data-view="list"  → shows list panel
-      - data-view="info"  → shows info panel
-      Both panels live here and are shown/hidden by CSS [data-view] selectors.
-      The sheet slides vertically only — no horizontal transform ever.
-    -->
-    <div id="sheet" class="sheet" data-view="list" aria-hidden="true">
-
-      <!-- Drag tab — sits above the sheet banner, always visible -->
-      <div class="sheet__drag-tab" id="sheet-drag-tab" aria-hidden="true">
-        <div class="sheet__grip"></div>
-      </div>
-
-      <!-- LIST VIEW — shown when data-view="list" -->
-      <div class="sheet__panel sheet__panel--list">
-        <div class="sheet__banner sheet__banner--list" id="sheet-list-banner">
-          <div class="brand-header brand-header--compact">
-            <img class="brand-logo" src="https://devdar.rapidteksolutions.com/wp-content/themes/react-ts-theme/assets/img/logo-dar.png" alt="Division of Aquatic Resources logo" width="36" height="36" />
-            <div class="brand-title-block"><h1 class="brand-title-main">Managed Areas</h1></div>
-            <img class="brand-logo" src="https://devdar.rapidteksolutions.com/wp-content/themes/react-ts-theme/assets/img/logo-state-of-hawai.png" alt="State of Hawaiʻi logo" width="36" height="36" />
+        <!-- Brand header — also the mobile sheet banner (list view).
+             .sheet__handle-btn is hidden on desktop via CSS.             -->
+        <header class="brand-panel" id="brand-panel">
+          <button class="sheet__handle-btn" id="sheet-handle-btn"
+                  type="button" aria-label="Expand areas list"
+                  aria-expanded="false">
+            <span class="sheet__grip" aria-hidden="true"></span>
+          </button>
+          <div class="brand-header">
+            <img class="brand-logo"
+                 src="https://devdar.rapidteksolutions.com/wp-content/themes/react-ts-theme/assets/img/logo-dar.png"
+                 alt="Division of Aquatic Resources logo" width="36" height="36" />
+            <div class="brand-title-block">
+              <h1 class="brand-title-main">Managed Areas</h1>
+            </div>
+            <img class="brand-logo"
+                 src="https://devdar.rapidteksolutions.com/wp-content/themes/react-ts-theme/assets/img/logo-state-of-hawai.png"
+                 alt="State of Hawaiʻi logo" width="36" height="36" />
           </div>
-        </div>
+        </header>
 
-        <div class="sidebar-search-wrap sheet__search">
+        <div class="sidebar-search-wrap">
           <div class="search-input-wrapper">
-            <label for="area-search-mobile" class="sr-only">Search marine and freshwater areas</label>
-            <input type="text" id="area-search-mobile" placeholder="Search areas…" autocomplete="off" spellcheck="false" />
-            <button class="search-clear-btn" type="button" aria-label="Clear search" id="search-clear-btn-mobile">✕</button>
+            <label for="area-search" class="sr-only">Search marine and freshwater areas</label>
+            <input type="text" id="area-search" placeholder="Search areas…"
+                   autocomplete="off" spellcheck="false" aria-controls="island-list" />
+            <button class="search-clear-btn" type="button"
+                    aria-label="Clear search" id="search-clear-btn">✕</button>
             <span class="search-icon" aria-hidden="true">🔍</span>
           </div>
         </div>
 
-        <div id="island-list-mobile" class="island-list" role="list" aria-label="Areas grouped by island" aria-live="polite" aria-busy="true">
+        <div id="island-list" class="island-list" role="list"
+             aria-label="Areas grouped by island" aria-live="polite" aria-busy="true">
           <div class="loading-notice" role="status">Loading marine areas…</div>
         </div>
-      </div>
 
-      <!-- INFO VIEW — shown when data-view="info" -->
-      <div class="sheet__panel sheet__panel--info">
-        <div class="sheet__banner sheet__banner--info" id="sheet-info-banner">
-          <div class="sheet__banner-row">
-            <button class="sheet__back-btn" id="sheet-back-btn" type="button" aria-label="Back to areas list">← Areas List</button>
-            <span class="sheet__banner-title" id="sheet-info-title">Area Info</span>
+      </aside>
+
+      <!-- ── INFO PANEL ─────────────────────────────────────── -->
+      <aside id="info-sidebar" class="info-sidebar" role="region"
+             aria-label="Area details" aria-live="polite">
+
+        <!-- Desktop header -->
+        <div class="info-panel-header">
+          <span class="info-panel-header__title" id="info-banner-title"
+                aria-live="polite">Area Info</span>
+        </div>
+
+        <!-- Mobile info header: handle + back + title -->
+        <div class="info-mobile-header" id="info-mobile-header">
+          <button class="sheet__handle-btn" id="info-handle-btn"
+                  type="button" aria-label="Expand area details"
+                  aria-expanded="false">
+            <span class="sheet__grip" aria-hidden="true"></span>
+          </button>
+          <div class="info-mobile-header__row">
+            <button class="sheet__back-btn" id="sheet-back-btn"
+                    type="button" aria-label="Back to areas list">← Areas List</button>
+            <span class="info-mobile-header__title"
+                  id="info-banner-title-mobile">Area Info</span>
           </div>
         </div>
-        <div id="info-content-mobile" class="info-content"></div>
-      </div>
 
-    </div><!-- /#sheet -->
+        <div id="info-content" class="info-content"></div>
 
-    <div id="map" role="application" aria-label="Interactive map of Hawaii managed areas"></div>
+      </aside>
+
+    </div><!-- /#panels -->
+
+    <div id="map" role="application"
+         aria-label="Interactive map of Hawaii managed areas"></div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
