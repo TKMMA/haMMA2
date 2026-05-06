@@ -10,8 +10,8 @@
 
 /* ── 1. DESIGN TOKENS ──────────────────────────────────────── */
 :root {
-  /* Brand — deep ocean palette */
-  --brand-900:  #001833;   /* deepest navy */
+  /* Brand */
+  --brand-900:  #001833;
   --brand-800:  #002244;
   --brand-700:  #003366;
   --brand-600:  #004C8C;
@@ -21,41 +21,40 @@
   --brand-100:  #D6EAF8;
   --brand-50:   #EBF5FB;
 
-  /* Desktop panel surfaces (light) */
-  --surface:         #ffffff;
-  --surface-tint:    #F4F8FC;
-  --surface-search:  #EBF2F8;
-  --surface-raised:  #F8FBFD;
+  /* Panel surfaces — light grey */
+  --surface:         #F0F4F8;   /* panel background */
+  --surface-card:    #FFFFFF;   /* card background */
+  --surface-card-alt:#F5F8FB;   /* summary card — slightly darker tint */
+  --surface-tint:    #E8EFF5;
+  --surface-search:  #E0E9F0;
+  --surface-raised:  #FAFCFE;
 
-  /* Desktop text (light panel) */
+  /* Text — dark on light */
   --text-primary:    #0F2030;
   --text-secondary:  #3D5A72;
   --text-muted:      #6B8599;
   --text-hint:       #98AFBF;
   --text-on-brand:   #ffffff;
 
-  /* Desktop borders (light panel) */
-  --border-light:    #E4EDF4;
-  --border-mid:      #C8D9E6;
-  --border-brand:    #B8D0E4;
+  /* Borders */
+  --border-light:    #D8E4EE;
+  --border-mid:      #B8CEDF;
+  --border-brand:    #A8C4DA;
 
-  /* Semantic — status colors (light context) */
-  --status-prohibited:      #B91C1C;
-  --status-prohibited-bg:   #FEF2F2;
-  --status-prohibited-bar:  #EF4444;
-  --status-allowed:         #166534;
-  --status-allowed-bg:      #F0FDF4;
-  --status-allowed-bar:     #22C55E;
-  --status-limited:         #78350F;
-  --status-limited-bg:      #FFFBEB;
-  --status-limited-bar:     #F59E0B;
-  --status-notes-bg:        var(--surface-search);
-  --status-notes-bar:       var(--border-mid);
+  /* Status colors — one set, works on both card types */
+  --status-prohibited:     #B91C1C;
+  --status-prohibited-bg:  #FEE2E2;
+  --status-allowed:        #166534;
+  --status-allowed-bg:     #DCFCE7;
+  --status-limited:        #78350F;
+  --status-limited-bg:     #FEF3C7;
+  --status-notes:          #374151;
+  --status-notes-bg:       #F3F4F6;
 
-  /* Map accent — polygon flash only */
+  /* Map accent */
   --map-accent:      #FFD60A;
 
-  /* Selected state */
+  /* Selected */
   --selected-bg:     #DBEAFE;
   --selected-text:   var(--brand-700);
 
@@ -63,9 +62,8 @@
   --font: 'DM Sans', system-ui, -apple-system, sans-serif;
 
   /* Panel geometry */
-  --panel-w:         380px;
-  --panel-w-list:    300px;   /* narrower in list-only mode */
-  --panel-w-info:    380px;   /* full width when info is open */
+  --panel-w-list:    300px;
+  --panel-w-info:    380px;
   --panel-radius:    16px;
   --panel-margin:    12px;
   --panel-header-h:  60px;
@@ -511,24 +509,43 @@ a { color: inherit; }
 .mmpopup__scroll > * { max-width: 100%; }
 
 
-/* ── 10. AREA CARDS ─────────────────────────────────────────── */
+/* ── 10. AREA CARDS — unified card system ───────────────────── */
+/*
+ * One visual style for both area-specific cards AND the summary card.
+ * .overlap-summary-card gets --surface-card-alt (slightly tinted).
+ * Everything else — pills, text, borders, radius — is identical.
+ */
 .mmcard {
+  background: var(--surface-card);
   border: 1px solid var(--border-light);
   border-radius: var(--r-md);
   overflow: hidden;
-  background: var(--surface);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
   margin-bottom: 10px;
 }
-.mmcard__body { padding: 12px 14px 14px; }
+/* Summary card — slightly darker tint, same everything else */
+.mmcard--summary,
+.overlap-summary-card {
+  background: var(--surface-card-alt);
+  border-color: var(--border-mid);
+}
+.mmcard--summary {
+  color: inherit;
+  border-radius: var(--r-md);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.overlap-summary-card { margin-bottom: 10px; overflow: hidden; }
+
+.mmcard__body        { padding: 12px 14px 14px; }
+.mmcard--summary .mmcard__body { padding: 14px; }
+
 .mmcard__title {
   font-size: 16px; font-weight: 700;
-  color: var(--brand-800);
-  margin: 0 0 5px; line-height: 1.25;
+  color: var(--text-primary);
+  margin: 0 0 6px; line-height: 1.25;
   letter-spacing: -0.01em;
 }
 
-/* External link button */
 .mmcard__image-wrap { position: relative; }
 .mmcard__image { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
 .mmcard__image-fallback {
@@ -578,15 +595,12 @@ a { color: inherit; }
 
 /* ── 11. FIELD BLOCKS ───────────────────────────────────────── */
 .field-stack { display: grid; gap: 2px; }
-
 .field-block {
   padding: 9px 12px;
   background: var(--surface-tint);
   border-radius: var(--r-sm);
-  border-left: 2px solid transparent;
 }
 .field-block:nth-child(even) { background: var(--surface-raised); }
-
 .field-block__label {
   font-size: 10px; font-weight: 700;
   color: var(--text-muted);
@@ -595,7 +609,7 @@ a { color: inherit; }
 }
 
 
-/* ── 12. RULES ──────────────────────────────────────────────── */
+/* ── 12. RULES — unified rendering ─────────────────────────── */
 .rules-category { margin-bottom: 14px; }
 .rules-category:last-child { margin-bottom: 0; }
 
@@ -607,99 +621,69 @@ a { color: inherit; }
   border-bottom: 1px solid var(--border-light);
 }
 
-/* Status block */
-.rule-status-block {
-  margin-bottom: 5px; border-radius: var(--r-sm); overflow: hidden;
-}
+.rule-status-block { margin-bottom: 5px; }
 .rule-status-block:last-child { margin-bottom: 0; }
 
-.rule-status-block__header {
-  font-size: 10px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.06em;
-  padding: 4px 10px 4px 9px;
-  border-left: 3px solid transparent;
-}
-
-/* Status pill in summary */
-.rule-status-label {
+/* ── STATUS PILLS — one style everywhere ────────────────────── */
+/* Used as: .rule-status-block__header, .rule-status-label,     */
+/*          .summary-status-group__header — all identical shape  */
+.rule-status-block__header,
+.rule-status-label,
+.summary-status-group__header {
   display: inline-flex; align-items: center;
   font-size: 10px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.05em;
-  padding: 2px 8px; border-radius: var(--r-pill);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 3px 10px; border-radius: var(--r-pill);
+  margin-bottom: 4px;
 }
 
-/* Light context */
-.rule-status--prohibited .rule-status-block__header {
-  background: var(--status-prohibited-bg);
-  color: var(--status-prohibited);
-  border-left-color: var(--status-prohibited-bar);
+.rule-status--prohibited .rule-status-block__header,
+.rule-status-label.rule-status--prohibited,
+.summary-status-group__header.rule-status--prohibited {
+  background: var(--status-prohibited-bg); color: var(--status-prohibited);
 }
-.rule-status--allowed .rule-status-block__header {
-  background: var(--status-allowed-bg);
-  color: var(--status-allowed);
-  border-left-color: var(--status-allowed-bar);
+.rule-status--allowed .rule-status-block__header,
+.rule-status-label.rule-status--allowed,
+.summary-status-group__header.rule-status--allowed {
+  background: var(--status-allowed-bg); color: var(--status-allowed);
 }
-.rule-status--limited .rule-status-block__header {
-  background: var(--status-limited-bg);
-  color: var(--status-limited);
-  border-left-color: var(--status-limited-bar);
+.rule-status--limited .rule-status-block__header,
+.rule-status-label.rule-status--limited,
+.summary-status-group__header.rule-status--limited {
+  background: var(--status-limited-bg); color: var(--status-limited);
 }
-.rule-status--notes .rule-status-block__header {
-  background: var(--status-notes-bg);
-  color: var(--text-secondary);
-  border-left-color: var(--status-notes-bar);
+.rule-status--notes .rule-status-block__header,
+.rule-status-label.rule-status--notes,
+.summary-status-group__header.rule-status--notes {
+  background: var(--status-notes-bg); color: var(--status-notes);
 }
-
-.rule-status-label.rule-status--prohibited { background: rgba(185,28,28,0.1); color: var(--status-prohibited); }
-.rule-status-label.rule-status--allowed    { background: rgba(22,101,52,0.1);  color: var(--status-allowed); }
-.rule-status-label.rule-status--limited    { background: rgba(120,53,15,0.1);  color: var(--status-limited); }
-.rule-status-label.rule-status--notes      { background: rgba(0,0,0,0.05);     color: var(--text-secondary); }
 
 .rule-item-list { margin: 0; padding: 6px 10px 6px 22px; list-style: disc; }
-.rule-item {
-  font-size: 13px; color: var(--text-primary);
-  line-height: 1.5; margin-bottom: 2px;
-}
+.rule-item { font-size: 13px; color: var(--text-primary); line-height: 1.5; margin-bottom: 2px; }
 .rule-item:last-child { margin-bottom: 0; }
 .rules-empty { font-size: 12px; color: var(--text-hint); font-style: italic; }
 
 
-/* ── 13. COMBINED SUMMARY CARD ──────────────────────────────── */
-/* Lifted slightly off panel — distinct from raw data cards */
-.overlap-summary-card {
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: var(--r-md);
-  background: #1E3D5C;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.28), 0 0 0 1px rgba(255,255,255,0.06);
-  overflow: hidden;
-  margin-bottom: 10px;
-  /* Always force white text — this card is always dark regardless of panel theme */
-  color: #fff;
-}
-.mmcard--summary { background: transparent; color: #fff; border: none; box-shadow: none; border-radius: 0; }
-.mmcard--summary .mmcard__body { padding: 14px; }
-
+/* ── 13. SUMMARY CARD LAYOUT ────────────────────────────────── */
+/* Visual styling handled by .mmcard--summary above. Layout only. */
 .summary-card-label {
   display: flex; align-items: center; gap: 8px;
   font-size: 10px; font-weight: 700;
   letter-spacing: 0.08em; text-transform: uppercase;
-  color: rgba(255,255,255,0.55); margin-bottom: 12px;
+  color: var(--text-muted); margin-bottom: 12px;
 }
 .summary-card-label::before {
   content: ''; display: block;
   width: 3px; height: 12px; border-radius: 2px;
-  background: rgba(255,255,255,0.35); flex-shrink: 0;
+  background: var(--border-mid); flex-shrink: 0;
 }
 
-.summary-source-legend__label {
-  font-size: 11px; color: rgba(255,255,255,0.5);
-  margin-bottom: 7px;
-}
+.summary-source-legend__label { font-size: 11px; color: var(--text-muted); margin-bottom: 7px; }
 .summary-source-pills { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
 .summary-source-pill {
   display: flex; align-items: center; gap: 8px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: var(--surface-tint);
+  border: 1px solid var(--border-light);
   border-radius: var(--r-pill);
   padding: 5px 12px 5px 6px;
   cursor: pointer; font-family: var(--font); text-align: left; width: 100%;
@@ -707,43 +691,22 @@ a { color: inherit; }
 }
 .summary-source-pill:hover,
 .summary-source-pill:focus-visible {
-  background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.25); outline: none;
+  background: var(--brand-50); border-color: var(--brand-300); outline: none;
 }
-.summary-source-pill__name {
-  font-size: 12px; font-weight: 500;
-  color: rgba(255,255,255,0.88); line-height: 1.3; flex: 1;
-}
+.summary-source-pill__name { font-size: 12px; font-weight: 500; color: var(--text-secondary); line-height: 1.3; flex: 1; }
 
 .summary-field-stack { display: grid; gap: 12px; }
 .summary-field-block { border-radius: var(--r-sm); }
 
 .summary-section-title {
-  font-size: 10px; font-weight: 700;
-  color: rgba(255,255,255,0.45);
+  font-size: 10px; font-weight: 700; color: var(--text-muted);
   text-transform: uppercase; letter-spacing: 0.07em;
   margin: 0 0 6px; padding-bottom: 5px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .summary-status-group { margin-bottom: 8px; }
 .summary-status-group:last-child { margin-bottom: 0; }
-
-.summary-status-group__header {
-  display: inline-flex; align-items: center;
-  font-size: 10px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.05em;
-  padding: 2px 8px; border-radius: var(--r-pill); margin-bottom: 6px;
-}
-
-/* Dark context status pills */
-.mmcard--summary .rule-status-label.rule-status--prohibited,
-.summary-status-group__header.rule-status--prohibited { background: rgba(239,68,68,0.2); color: #FCA5A5; }
-.mmcard--summary .rule-status-label.rule-status--allowed,
-.summary-status-group__header.rule-status--allowed    { background: rgba(34,197,94,0.15); color: #86EFAC; }
-.mmcard--summary .rule-status-label.rule-status--limited,
-.summary-status-group__header.rule-status--limited    { background: rgba(245,158,11,0.18); color: #FCD34D; }
-.mmcard--summary .rule-status-label.rule-status--notes,
-.summary-status-group__header.rule-status--notes      { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.5); }
 
 .summary-field-entry { padding: 2px 0; }
 .summary-field-entry__chips { display: none; }
@@ -754,10 +717,7 @@ a { color: inherit; }
   display: inline-flex; gap: 3px; flex-shrink: 0;
   align-items: center; position: relative; top: 1px;
 }
-
-.mmcard--summary .rule-item-list { padding-left: 14px; }
-.mmcard--summary .rule-item { color: rgba(255,255,255,0.85); font-size: 12px; line-height: 1.5; }
-.summary-empty { font-size: 12px; color: rgba(255,255,255,0.55); margin: 0; }
+.summary-empty { font-size: 12px; color: var(--text-muted); margin: 0; }
 
 /* Source chips */
 .source-chip {
@@ -1007,39 +967,8 @@ a { color: inherit; }
 .share-toast.is-visible { opacity: 1; }
 
 
-/* ── Dark panel — applied globally (desktop + mobile) ──────── */
-/* This replaces the mobile-only override. Both platforms use dark. */
+/* ── Panel surface — light grey, consistent on both platforms ── */
 #panel {
-  --surface:          #0D1B2A;
-  --surface-tint:     #152536;
-  --surface-raised:   #192D40;
-  --surface-search:   #152536;
-
-  --text-primary:     #E0EEF5;
-  --text-secondary:   #8BAFC4;
-  --text-muted:       #4A7A96;
-  --text-hint:        #345E78;
-
-  --border-light:     rgba(255,255,255,0.07);
-  --border-mid:       rgba(255,255,255,0.12);
-  --border-brand:     rgba(255,255,255,0.08);
-
-  --selected-bg:      #1A3A5C;
-  --selected-text:    #A8D4EE;
-
-  /* Status colors — readable on dark */
-  --status-prohibited:      #FCA5A5;
-  --status-prohibited-bg:   rgba(239,68,68,0.15);
-  --status-prohibited-bar:  #EF4444;
-  --status-allowed:         #86EFAC;
-  --status-allowed-bg:      rgba(34,197,94,0.12);
-  --status-allowed-bar:     #22C55E;
-  --status-limited:         #FCD34D;
-  --status-limited-bg:      rgba(245,158,11,0.14);
-  --status-limited-bar:     #F59E0B;
-  --status-notes-bg:        rgba(255,255,255,0.05);
-  --status-notes-bar:       rgba(255,255,255,0.15);
-
   background: var(--surface);
 }
 
