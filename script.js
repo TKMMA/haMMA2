@@ -176,21 +176,15 @@
 
 
   // ── 3. DOM REFERENCES ────────────────────────────────────────
-  const mapInterfaceEl = document.querySelector('.map-interface');
-  const mapSidebarEl   = document.getElementById('map-sidebar');   // desktop only
-  const infoSidebarEl  = document.getElementById('info-sidebar');  // desktop only
-  const sheetEl        = document.getElementById('sheet');         // mobile only
-  // On mobile, content lives in the sheet. On desktop, in the sidebar panels.
-  // islandListEl / infoContentEl / areaSearchEl point to the correct element
-  // depending on viewport — resolved after boot via getActiveEls() helpers.
-  const islandListEl   = document.getElementById('island-list');          // desktop
-  const islandListMobEl = document.getElementById('island-list-mobile');  // mobile
-  const infoContentEl  = document.getElementById('info-content');         // desktop
-  const infoContentMobEl = document.getElementById('info-content-mobile');// mobile
-  const areaSearchEl   = document.getElementById('area-search');          // desktop
-  const areaSearchMobEl = document.getElementById('area-search-mobile');  // mobile
-  const searchClearEl  = document.getElementById('search-clear-btn');
-  const searchClearMobEl = document.getElementById('search-clear-btn-mobile');
+  // Single DOM — no mobile/desktop duplication.
+  const mapInterfaceEl  = document.querySelector('.map-interface');
+  const panelsEl        = document.getElementById('panels');
+  const mapSidebarEl    = document.getElementById('map-sidebar');
+  const infoSidebarEl   = document.getElementById('info-sidebar');
+  const islandListEl    = document.getElementById('island-list');
+  const infoContentEl   = document.getElementById('info-content');
+  const areaSearchEl    = document.getElementById('area-search');
+  const searchClearEl   = document.getElementById('search-clear-btn');
 
 
   // ── 4. UTILITIES ─────────────────────────────────────────────
@@ -306,11 +300,6 @@
     }).join('');
   }
 
-  function stripCalloutPrefix(text) {
-    return String(text)
-      .replace(/^(?:[-•]\s*)?(?:Prohibited|Allowed[^:]*)[^:]*:\s*/i, '')
-      .trim();
-  }
 
   function buildSummarySources(features) {
     return features.map((feature, index) => ({
@@ -331,53 +320,6 @@
     return sources.map((s) => renderSourceChip(s)).join('');
   }
 
-  function splitRuleLines(text) {
-    if (!text || text === 'N/A') return [];
-    const calloutStart = /^(?:[-•]\s*)?(Prohibited[^:]*:|Allowed[^:]*:)/i;
-    const lines = normalizeRuleSegments(text)
-      .replace(/\r\n?/g, '\n')
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean);
-    const blocks = [];
-    let current = [];
-    lines.forEach((line) => {
-      if (calloutStart.test(line)) {
-        if (current.length) blocks.push(current.join('\n'));
-        current = [line];
-      } else if (current.length) {
-        current.push(line);
-      } else {
-        blocks.push(line);
-      }
-    });
-    if (current.length) blocks.push(current.join('\n'));
-    return blocks;
-  }
-
-  function classifyRuleLine(line) {
-    const value = String(line).trim();
-    const lower = value.toLowerCase();
-    if (/^prohibited\b/.test(lower)) return 'prohibited';
-    if (/^allowed\b.*\b(limit|limits|limitation|limitations)\b/.test(lower) || /^allowed\s+with\s+limits?\b/.test(lower)) return 'limited';
-    if (/^allowed\b/.test(lower)) return 'allowed';
-    return 'other';
-  }
-
-  function parseRuleField(text) {
-    return splitRuleLines(text).map((block) => ({
-      text: block,
-      status: classifyRuleLine(block.split('\n')[0] || block),
-    }));
-  }
-
-  function normalizeRuleForMerge(text) {
-    return String(text)
-      .replace(/\s+/g, ' ')
-      .replace(/[.]+$/g, '.')
-      .trim()
-      .toLowerCase();
-  }
 
 
 
@@ -425,18 +367,21 @@
   // ── 7. RESPONSIVE / LAYOUT HELPERS ───────────────────────────
   const isMobileView = () => MOBILE_BREAKPOINT.matches;
 
-  // Active DOM element helpers — return the right element for the current viewport
-  function getIslandListEl()  { return isMobileView() ? islandListMobEl  : islandListEl; }
-  function getInfoContentEl() { return isMobileView() ? infoContentMobEl : infoContentEl; }
-  function getAreaSearchEl()  { return isMobileView() ? areaSearchMobEl  : areaSearchEl; }
+  // How tall the sheet is when in its default (half) position — used for
+  // fitBounds padding so the map centres above the sheet.
+  function getSheetHeight() {
+    return Math.round(window.innerHeight * 0.5);
+  }
 
   function syncMobileBrowserInset() {
-    if (!sheetEl) return;
+    if (!isMobileView()) return;
     const vv = window.visualViewport;
     const inset = vv
       ? Math.max(0, Math.round(window.innerHeight - (vv.height + vv.offsetTop)))
       : 0;
-    sheetEl.style.setProperty('--browser-offset', `${inset}px`);
+    // Apply to both panels — whichever is visible will use it
+    mapSidebarEl?.style.setProperty('--browser-offset', `${inset}px`);
+    infoSidebarEl?.style.setProperty('--browser-offset', `${inset}px`);
   }
 
   function syncLeafletControlPosition() {
@@ -461,110 +406,100 @@
 
   // ── 8. MOBILE STATE MACHINE ──────────────────────────────────
   //
-  // Single source of truth: mobileState
-  //   'hidden'    — sheet peeks (only banner + drag tab visible)
-  //   'list-open' — list panel at half height
-  //   'list-full' — list panel at full height
-  //   'info-half' — info panel at half height
-  //   'info-full' — info panel at full height
+  // Two independent pieces of state:
+  //   view     — 'list' | 'info'   (which panel is visible)
+  //   expanded — true | false       (sheet at full vs half height)
   //
-  // applyMobileState() is the ONLY place that touches #sheet attributes.
-  // It sets two attributes:
-  //   data-snap  = "hidden" | "open" | "full"
-  //   data-view  = "list"   | "info"
-  // CSS handles all visual output from those two attributes — no X transform.
+  // Both are stored on #panels via data-view and .is-expanded on the
+  // active sidebar element. CSS does all the visual work.
+  //
+  // Public API: setView(v), setExpanded(bool), toggleExpanded()
 
-  let mobileState    = 'list-open';
-  let lastListState  = 'list-open';
+  let mobileView     = 'list';
+  let mobileExpanded = false;
   let activeLastBounds = null;
   let _pendingMoveendHandler = null;
 
-  // Snap Y positions — used ONLY for drag math (reading current transform)
-  // CSS drives actual snap positions. These must mirror style.css values.
-  function snapY(state) {
-    const H = window.innerHeight;
-    const bh = 58; // --sheet-banner-h
-    const th = 22; // --sheet-tab-h
-    if (state === 'hidden')    return H - bh - th;
-    if (state === 'list-open') return H * 0.50 - bh;
-    if (state === 'list-full') return H * 0.03;
-    if (state === 'info-half') return H * 0.50 - bh;
-    if (state === 'info-full') return H * 0.22;
-    return H - bh - th;
+  function getActivePanel() {
+    return mobileView === 'info' ? infoSidebarEl : mapSidebarEl;
   }
 
-  function infoToListState(state) {
-    if (state === 'info-full') return 'list-full';
-    return 'list-open';
+  function setView(view) {
+    if (!isMobileView()) return;
+    mobileView = view;
+    panelsEl.dataset.view = view;
+
+    // Sync handle button aria-expanded on both panels
+    const listHandle = document.getElementById('sheet-handle-btn');
+    const infoHandle = document.getElementById('info-handle-btn');
+    if (listHandle) listHandle.setAttribute('aria-expanded', String(mobileExpanded && view === 'list'));
+    if (infoHandle) infoHandle.setAttribute('aria-expanded', String(mobileExpanded && view === 'info'));
   }
 
-  function applyMobileState(nextState, opts = {}) {
-    if (!isMobileView() || !sheetEl) return;
+  function setExpanded(expanded) {
+    if (!isMobileView()) return;
+    mobileExpanded = expanded;
+    const panel = getActivePanel();
+    panel?.classList.toggle('is-expanded', expanded);
 
-    const prevState = mobileState;
-    mobileState     = nextState;
+    // Sync aria-expanded on the active handle
+    const handleId = mobileView === 'info' ? 'info-handle-btn' : 'sheet-handle-btn';
+    const handle = document.getElementById(handleId);
+    if (handle) handle.setAttribute('aria-expanded', String(expanded));
+  }
 
-    // Derive data-view and data-snap from the state name
-    const isInfoView = nextState === 'info-half' || nextState === 'info-full' ||
-                       (nextState === 'hidden' && (
-                         prevState === 'info-half' || prevState === 'info-full' ||
-                         sheetEl.dataset.view === 'info'
-                       ));
+  function toggleExpanded() {
+    setExpanded(!mobileExpanded);
+  }
 
-    sheetEl.dataset.view = isInfoView ? 'info' : 'list';
-
-    if (nextState === 'hidden') {
-      sheetEl.dataset.snap = 'hidden';
-    } else if (nextState === 'list-open' || nextState === 'info-half') {
-      sheetEl.dataset.snap = 'open';
-    } else {
-      sheetEl.dataset.snap = 'full';
+  // Convenience: switch to info view at half height, then recentre map
+  function openInfoView(opts = {}) {
+    if (!isMobileView()) return;
+    // Always start info at half height so map is visible
+    infoSidebarEl?.classList.remove('is-expanded');
+    mobileExpanded = false;
+    setView('info');
+    if (!opts.skipRecentre && activeLastBounds) {
+      scheduleMobileFit(activeLastBounds);
     }
+  }
 
-    // Remember list state when entering info view
-    if ((prevState === 'list-open' || prevState === 'list-full') && isInfoView) {
-      lastListState = prevState;
-    }
-
-    // Schedule fly-to after sheet settles
-    const shouldRecentre = isInfoView && nextState === 'info-half' && !opts.skipRecentre;
-    const returningFullToHalf = prevState === 'info-full' && nextState === 'info-half';
-    if ((shouldRecentre || returningFullToHalf) && lastSelectionSource === 'menu') {
-      scheduleMobileFly(activeLastBounds, activeLastLatlng);
-    }
+  // Return to list at same expansion state
+  function openListView() {
+    if (!isMobileView()) return;
+    mapSidebarEl?.classList.remove('is-expanded');
+    mobileExpanded = false;
+    setView('list');
   }
 
   function syncResponsiveSidebarState() {
     if (isMobileView()) {
-      // Show the sheet, hide desktop panels (CSS handles this too but be explicit)
-      if (sheetEl) sheetEl.style.display = '';
-      applyMobileState(mobileState, { skipRecentre: true });
+      // Restore correct data-view and expansion on resize/orientation change
+      panelsEl.dataset.view = mobileView;
+      const panel = getActivePanel();
+      mapSidebarEl?.classList.toggle('is-expanded', mobileExpanded && mobileView === 'list');
+      infoSidebarEl?.classList.toggle('is-expanded', mobileExpanded && mobileView === 'info');
       syncMobileBrowserInset();
     } else {
-      // Desktop — hide the sheet, desktop panels visible via CSS
-      if (sheetEl) sheetEl.style.display = 'none';
-      if (mapSidebarEl)  mapSidebarEl.classList.remove('is-collapsed');
-      if (infoSidebarEl) infoSidebarEl.classList.remove('is-offscreen');
+      // Desktop — clear all mobile state classes
+      panelsEl.dataset.view = 'list'; // reset so desktop shows both panels
+      mapSidebarEl?.classList.remove('is-expanded');
+      infoSidebarEl?.classList.remove('is-expanded');
+      mapSidebarEl?.classList.remove('is-collapsed');
+      infoSidebarEl?.classList.remove('is-offscreen');
       setMapSidebarDesktopState();
     }
-
     syncSidebarToggleUI();
     syncLeafletControlPosition();
-
-    // Tell Leaflet about the size change so tiles aren't clipped
-    // after orientation flips or window resizes.
     if (map) map.invalidateSize({ animate: false });
   }
 
   function setInitialMapExtent() {
     if (!map) return;
     if (isMobileView()) {
-      // On mobile, the list sheet covers ~50% of the screen from the bottom.
-      // Increase bottom padding significantly so the island chain sits in the
-      // visible top half of the screen on load.
       map.fitBounds(INITIAL_CHAIN_BOUNDS, {
         paddingTopLeft:     [12, 30],
-        paddingBottomRight: [12, 320],
+        paddingBottomRight: [12, getSheetHeight()],
         maxZoom: 8.3,
       });
       return;
@@ -575,121 +510,6 @@
       paddingBottomRight: [24, 30],
       maxZoom: 8.5,
     });
-  }
-
-
-  // ── DRAG BEHAVIOUR ───────────────────────────────────────────
-  // The drag tab controls the sheet Y transform in real time.
-  // No X-axis logic — panel switching is handled by data-view attribute.
-  // Two-phase system: passive observation first, active control only after
-  // a clear vertical drag is confirmed. Scroll containers are never blocked.
-
-  const LIST_SNAPS = ['hidden', 'list-open', 'list-full'];
-  const INFO_SNAPS = ['hidden', 'info-half', 'info-full'];
-
-  let _drag = null;
-
-  function _cleanupDrag() {
-    document.removeEventListener('touchmove', _passiveDragWatch, { passive: true });
-    document.removeEventListener('touchmove', _activeDragMove);
-    document.removeEventListener('touchend',  _dragEnd);
-    document.removeEventListener('touchcancel', _dragEnd);
-    sheetEl?.classList.remove('is-dragging');
-    _drag = null;
-  }
-
-  // Phase 1: passive — does NOT block scrolling
-  function _passiveDragWatch(e) {
-    if (!_drag) { _cleanupDrag(); return; }
-    const touch     = (e.touches || [e])[0];
-    const absDeltaY = Math.abs(touch.clientY - _drag.startY);
-    const absDeltaX = Math.abs(touch.clientX - _drag.startX);
-
-    if (absDeltaY < 8) return;
-
-    if (absDeltaX > absDeltaY * 1.2) {
-      _cleanupDrag();
-      return;
-    }
-
-    // Confirmed vertical drag — upgrade to active
-    document.removeEventListener('touchmove', _passiveDragWatch, { passive: true });
-
-    sheetEl.classList.add('is-dragging');
-    const matrix  = new DOMMatrix(getComputedStyle(sheetEl).transform);
-    _drag.baseY   = matrix.f;
-    _drag.lastY   = matrix.f;
-    _drag.lastTime = Date.now();
-
-    document.addEventListener('touchmove', _activeDragMove, { passive: false });
-  }
-
-  // Phase 2: active drag
-  function _activeDragMove(e) {
-    if (!_drag) return;
-    e.preventDefault();
-
-    const touch    = (e.touches || [e])[0];
-    const deltaY   = touch.clientY - _drag.startY;
-    const rawY     = _drag.baseY + deltaY;
-    const view     = sheetEl.dataset.view || 'list';
-    const minY     = snapY(view === 'info' ? 'info-full' : 'list-full');
-    const maxY     = snapY('hidden');
-    const clampedY = Math.max(minY, Math.min(maxY, rawY));
-
-    const now = Date.now();
-    const dt  = now - _drag.lastTime || 1;
-    _drag.velocity = (clampedY - _drag.lastY) / dt;
-    _drag.lastY    = clampedY;
-    _drag.lastTime = now;
-
-    sheetEl.style.transform = `translateY(${clampedY}px)`;
-  }
-
-  // Drag end — snap to nearest state
-  function _dragEnd() {
-    if (!_drag) return;
-    const wasActive  = sheetEl.classList.contains('is-dragging');
-    const currentY   = _drag.lastY;
-    const velocity   = _drag.velocity;
-    _cleanupDrag();
-
-    if (!wasActive) return;
-
-    sheetEl.style.transform = '';
-    const projectedY = currentY + velocity * 180;
-
-    const view  = sheetEl.dataset.view || 'list';
-    const snaps = view === 'info' ? INFO_SNAPS : LIST_SNAPS;
-    const nearest = snaps
-      .map((s) => ({ state: s, dist: Math.abs(projectedY - snapY(s)) }))
-      .sort((a, b) => a.dist - b.dist)[0].state;
-
-    applyMobileState(nearest);
-  }
-
-  function onSheetDragStart(e) {
-    if (!isMobileView() || !sheetEl) return;
-    if (_drag) return;
-
-    const firstTouch = (e.touches || [e])[0];
-    const targetEl   = firstTouch
-      ? (document.elementFromPoint(firstTouch.clientX, firstTouch.clientY) || firstTouch.target)
-      : e.target;
-    if (targetEl?.closest('button, a')) return;
-
-    _drag = {
-      startX:   firstTouch.clientX,
-      startY:   firstTouch.clientY,
-      baseY:    0,
-      lastY:    0,
-      lastTime: Date.now(),
-      velocity: 0,
-    };
-
-    document.addEventListener('touchmove', _passiveDragWatch, { passive: true });
-    document.addEventListener('touchend',    _dragEnd, { passive: false });
-    document.addEventListener('touchcancel', _dragEnd, { passive: false });
   }
 
 
@@ -722,7 +542,7 @@
     return Math.max(0, Math.max(...rightEdges) - mapRect.left);
   }
 
-  // Desktop-only — mobile uses flyToMobileVisible directly without rects.
+  // Desktop-only — mobile uses fitMobileVisible with paddingBottomRight.
   function getVisibleMapRect(padding = 30) {
     const size = map.getSize();
     const leftOverlayWidth = getLeftOverlayWidth();
@@ -745,126 +565,28 @@
     return map.getBoundsZoom(bounds, false, L.point(getLeftOverlayWidth() + 30, 30));
   }
 
-  function getMobileVisibleMapStrip() {
-    const mapRect = map.getContainer().getBoundingClientRect();
-    const stageRect = sheetEl?.getBoundingClientRect();
-    const sheetTop = stageRect ? Math.max(mapRect.top, stageRect.top) : (mapRect.top + mapRect.height * 0.5);
-    const sidePadding = 16;
-    const topPadding = 10;
-    const bottomPadding = 8;
-    const left = sidePadding;
-    const right = Math.max(left + 40, mapRect.width - sidePadding);
-    const top = topPadding;
-    const bottom = Math.max(top + 24, (sheetTop - mapRect.top) - bottomPadding);
-    const width = Math.max(40, right - left);
-    const height = Math.max(24, bottom - top);
-    return {
-      left,
-      right,
-      top,
-      bottom,
-      width,
-      height,
-      centerX: left + (width / 2),
-      centerY: top + (height / 2),
-    };
-  }
-
-  function featureFitsVisibleArea(bounds, padding = 30) {
-    const rect = getVisibleMapRect(padding);
-    const nw   = map.latLngToContainerPoint(bounds.getNorthWest());
-    const se   = map.latLngToContainerPoint(bounds.getSouthEast());
-    return (
-      Math.min(nw.x, se.x) >= rect.left  &&
-      Math.max(nw.x, se.x) <= rect.right &&
-      Math.min(nw.y, se.y) >= rect.top   &&
-      Math.max(nw.y, se.y) <= rect.bottom
-    );
-  }
-
-  function featureIsCenteredInVisibleArea(bounds, tolerancePx = 6) {
-    const rect           = getVisibleMapRect();
-    const center         = map.latLngToContainerPoint(bounds.getCenter());
-    const visibleCenterY = map.getSize().y / 2;
-    return (
-      Math.abs(center.x - rect.centerX)  <= tolerancePx &&
-      Math.abs(center.y - visibleCenterY) <= tolerancePx
-    );
-  }
-
-  function flySelectionIntoVisibleArea(latlng, duration = 1.0) {
-    if (!latlng) return;
-    const rect   = getVisibleMapRect();
-    const point  = map.latLngToContainerPoint(latlng);
-    const delta  = Math.round(rect.centerX - point.x);
-    if (Math.abs(delta) < 2) return;
-    const target = map.containerPointToLatLng(L.point(point.x + delta, point.y));
-    map.flyTo(target, map.getZoom(), { animate: true, duration, easeLinearity: 0.2 });
-  }
-
-
-  // Fit and centre the selection in the visible map strip above the sheet.
-  // Cancels any in-flight pending call so two selections never race.
-  // bounds: L.LatLngBounds of the selected feature (for zoom-to-fit).
-  // latlng: centre point to centre on (used when bounds not available).
-  // Place a polygon in the visible strip above the mobile bottom sheet.
-  // Approach: pick a target zoom, compute the target screen position
-  // (centre of visible strip), then offset the map centre by the difference.
-  function flyToMobileVisible(bounds, latlng) {
-    if (!isMobileView()) return;
+  // Fit a selection into the visible map strip above the sheet.
+  // Uses Leaflet's built-in paddingBottomRight — no manual projection math.
+  function fitMobileVisible(bounds) {
+    if (!isMobileView() || !bounds) return;
     if (_flyTimer) { clearTimeout(_flyTimer); _flyTimer = null; }
-    const center = latlng || (bounds ? bounds.getCenter() : null);
-    if (!center) return;
-
-    const screenW = map.getSize().x;
-    const screenH = map.getSize().y;
-    const strip = getMobileVisibleMapStrip();
-    if (!strip) return;
-    const stripCenterY = strip.centerY;
-    const stripCenterX = screenW / 2;
-
-    // ── Pick a zoom that fits the polygon in the visible strip ────
-    let targetZoom = map.getZoom();
-    if (bounds) {
-      if (mobileState === 'info-full' && strip.height < 120) {
-        return;
-      }
-      const stripH = strip.height;
-      const stripW = strip.width;
-      // Use a synthetic point as padding to fit-zoom into our strip
-      targetZoom = map.getBoundsZoom(
-        bounds,
-        false,
-        L.point(Math.max(32, screenW - stripW), Math.max(32, screenH - stripH)),
-      );
-      // Clamp to map's zoom range (imagery has no detail past ~17–18)
-      const maxZ = map.getMaxZoom?.() ?? 18;
-      const minZ = map.getMinZoom?.() ?? 0;
-      targetZoom = Math.max(minZ, Math.min(targetZoom, Math.min(16, maxZ)));
-    }
-
-    // ── Compute target latlng: where the map centre needs to be so       ──
-    // ── that `center` ends up at (stripCenterX, stripCenterY) on screen. ──
-    // Project at the target zoom (not current zoom!), then offset.
-    const centerPoint    = map.project(center, targetZoom);
-    const offsetX        = stripCenterX - screenW / 2;
-    const offsetY       = stripCenterY - screenH / 2;
-    const targetMapPoint = centerPoint.subtract(L.point(offsetX, offsetY));
-    const targetLatLng   = map.unproject(targetMapPoint, targetZoom);
-
-    map.flyTo(targetLatLng, targetZoom, {
-      animate: true,
-      duration: 0.8,
-      easeLinearity: 0.2,
+    const sheetH = getSheetHeight();
+    map.fitBounds(bounds, {
+      animate:            true,
+      duration:           0.8,
+      easeLinearity:      0.2,
+      paddingTopLeft:     [16, 16],
+      paddingBottomRight: [16, sheetH + 16],
+      maxZoom:            16,
     });
   }
 
-  // Schedule a fly-to after the sheet settles, cancelling any previous pending call.
-  function scheduleMobileFly(bounds, latlng, delay = SHEET_TRANSITION_MS) {
+  // Schedule fit after the sheet transition settles.
+  function scheduleMobileFit(bounds, delay = SHEET_TRANSITION_MS) {
     if (_flyTimer) { clearTimeout(_flyTimer); _flyTimer = null; }
     _flyTimer = setTimeout(() => {
       _flyTimer = null;
-      flyToMobileVisible(bounds, latlng);
+      fitMobileVisible(bounds);
     }, delay);
   }
 
@@ -1049,11 +771,6 @@
     map.stop();
     activeLastBounds = null;
     lastSelectionSource = null;
-    const hadSelection = Boolean(
-      activeSelectionMarker ||
-      activeAccordionLayer  ||
-      infoSidebarEl?.classList.contains('active'),
-    );
 
     if (activeSelectionMarker) {
       map.removeLayer(activeSelectionMarker);
@@ -1065,7 +782,7 @@
     setActiveAreaItem(null, null);
 
     if (isMobileView()) {
-      applyMobileState('list-open');
+      openListView();
     } else {
       closeInfoPanel();
     }
@@ -1592,32 +1309,24 @@
     </div>`;
 
   function openAboutPane() {
-    // Close any active map selection cleanly
     clearMapSelection({ keepInfoOpen: false });
 
-    // Update header titles
     const desktopTitle = document.getElementById('info-banner-title');
-    const mobileTitle  = document.getElementById('sheet-info-title');
+    const mobileTitle  = document.getElementById('info-banner-title-mobile');
     if (desktopTitle) desktopTitle.textContent = 'About';
     if (mobileTitle)  mobileTitle.textContent  = 'About';
 
-    // Render into the active info content element
-    const target = getInfoContentEl();
-    if (target) {
-      target.innerHTML = `
-        <div class="mmpopup">
-          <div class="mmpopup__scroll">${README_HTML}</div>
-        </div>`;
-    }
+    infoContentEl.innerHTML = `
+      <div class="mmpopup">
+        <div class="mmpopup__scroll">${README_HTML}</div>
+      </div>`;
 
-    // Open the info panel on mobile / desktop
     if (isMobileView()) {
-      applyMobileState('info-half');
+      openInfoView();
     } else {
       infoSidebarEl.classList.add('active');
     }
 
-    // Clear list active state
     clearAccordionSelectionHighlight();
   }
 
@@ -1648,27 +1357,24 @@
       });
       if (targetLayer) overlapCount = countOverlapsForFeature(targetLayer);
     }
-    const target = getInfoContentEl();
-    if (!target) return;
-
-    target.innerHTML = isMulti
+    infoContentEl.innerHTML = isMulti
       ? renderOverlapInfoPane(features)
       : renderSingleAreaInfoPane(features[0], overlapCount);
 
-    target.querySelector('.mmpopup__scroll').scrollTop = 0;
+    infoContentEl.querySelector('.mmpopup__scroll').scrollTop = 0;
 
-    // Sync the panel header title (desktop) and mobile banner title
+    // Sync panel header titles
     const panelTitle = isMulti
       ? `${count} Area${count === 1 ? '' : 's'} Selected`
       : areaName;
     const desktopTitle = document.getElementById('info-banner-title');
-    const mobileTitle  = document.getElementById('sheet-info-title');
+    const mobileTitle  = document.getElementById('info-banner-title-mobile');
     if (desktopTitle) desktopTitle.textContent = panelTitle;
     if (mobileTitle)  mobileTitle.textContent  = panelTitle;
 
 
     if (isMobileView()) {
-      applyMobileState('info-half');
+      openInfoView({ skipRecentre: options.source !== 'menu' });
     } else {
       infoSidebarEl.classList.add('active');
     }
@@ -1700,7 +1406,7 @@
   // setInfoSidebarState('hidden') internally.
   function closeInfoPanel() {
     if (isMobileView()) {
-      applyMobileState('list-open');
+      openListView();
       return;
     }
     infoSidebarEl.classList.remove('active');
@@ -1708,70 +1414,56 @@
 
 
   // ── 16. SIDEBAR — POPULATION ─────────────────────────────────
-  // Populates BOTH island lists (desktop and mobile sheet) from a single call.
   function populateSidebar(islandName, sortedNames) {
-    _populateIslandList(islandListEl,    islandName, sortedNames);
-    _populateIslandList(islandListMobEl, islandName, sortedNames);
-  }
+    if (!islandListEl) return;
 
-  function _populateIslandList(listEl, islandName, sortedNames) {
-    if (!listEl) return;
-
-    const notice = listEl.querySelector('.loading-notice');
+    const notice = islandListEl.querySelector('.loading-notice');
     if (notice) notice.remove();
 
     const islandId = islandName.replace(/[^a-zA-Z0-9]/g, '');
-    // Use a suffix to avoid ID collisions between desktop and mobile lists
-    const isMob    = listEl === islandListMobEl;
-    const suffix   = isMob ? '-mob' : '';
-    const fragment = document.createDocumentFragment();
+    const fragment  = document.createDocumentFragment();
 
-    const group       = document.createElement('div');
-    group.className   = 'island-group';
+    const group = document.createElement('div');
+    group.className = 'island-group';
 
-    const header      = document.createElement('button');
-    header.className  = 'island-header';
-    header.id         = `header-${islandId}${suffix}`;
+    const header = document.createElement('button');
+    header.className = 'island-header';
+    header.id = `header-${islandId}`;
     header.setAttribute('aria-expanded', 'false');
-    header.setAttribute('aria-controls',  `list-${islandId}${suffix}`);
-    header.addEventListener('click', () => toggleIslandInList(listEl, islandId, suffix));
+    header.setAttribute('aria-controls', `list-${islandId}`);
+    header.addEventListener('click', () => toggleIsland(islandId));
 
-    const headerLeft      = document.createElement('div');
-    headerLeft.className  = 'header-left';
-
+    const headerLeft = document.createElement('div');
+    headerLeft.className = 'header-left';
     const islandLabel = document.createElement('span');
     islandLabel.textContent = islandName;
-
     headerLeft.append(islandLabel);
 
-    const chevron     = document.createElement('span');
+    const chevron = document.createElement('span');
     chevron.className = 'chevron';
     chevron.textContent = '▼';
     chevron.setAttribute('aria-hidden', 'true');
 
     header.append(headerLeft, chevron);
 
-    const list      = document.createElement('div');
-    list.id         = `list-${islandId}${suffix}`;
-    list.className  = 'area-list';
+    const list = document.createElement('div');
+    list.id = `list-${islandId}`;
+    list.className = 'area-list';
     list.setAttribute('role', 'list');
 
     sortedNames.forEach((areaName) => {
-      const item        = document.createElement('div');
-      item.className    = 'area-item';
-      item.textContent  = areaName;
-      item.tabIndex     = 0;
-      item.setAttribute('role',       'button');
+      const item = document.createElement('div');
+      item.className = 'area-item';
+      item.textContent = areaName;
+      item.tabIndex = 0;
+      item.setAttribute('role', 'button');
       item.setAttribute('aria-label', `View details for ${areaName}`);
       item.dataset.island = islandName;
-      item.dataset.area   = areaName;
+      item.dataset.area = areaName;
 
-      item.addEventListener('click',      () => zoomToArea(islandName, areaName));
-      item.addEventListener('keydown',    (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          zoomToArea(islandName, areaName);
-        }
+      item.addEventListener('click',    () => zoomToArea(islandName, areaName));
+      item.addEventListener('keydown',  (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); zoomToArea(islandName, areaName); }
       });
       item.addEventListener('mouseenter', () => hoverArea(islandName, areaName));
       item.addEventListener('mouseleave', clearHoverHighlight);
@@ -1781,49 +1473,34 @@
 
     group.append(header, list);
     fragment.appendChild(group);
-    listEl.appendChild(fragment);
+    islandListEl.appendChild(fragment);
   }
 
 
   // ── 17. SIDEBAR — INTERACTIONS ───────────────────────────────
-  function toggleIslandInList(listEl, id, suffix) {
-    const list   = listEl.querySelector(`#list-${id}${suffix}`);
-    const header = listEl.querySelector(`#header-${id}${suffix}`);
+  function toggleIsland(id) {
+    const list   = document.getElementById(`list-${id}`);
+    const header = document.getElementById(`header-${id}`);
     if (!list || !header) return;
 
     const shouldOpen = !list.classList.contains('active');
 
-    // On mobile: enforce single-expand
+    // Mobile: single-expand — close others first
     if (isMobileView()) {
-      listEl.querySelectorAll('.area-list.active').forEach((el) => {
-        if (el.id !== `list-${id}${suffix}`) el.classList.remove('active');
+      islandListEl.querySelectorAll('.area-list.active').forEach((el) => {
+        if (el !== list) el.classList.remove('active');
       });
-      listEl.querySelectorAll('.island-header.expanded').forEach((el) => {
-        if (el.id !== `header-${id}${suffix}`) el.classList.remove('expanded');
+      islandListEl.querySelectorAll('.island-header.expanded').forEach((el) => {
+        if (el !== header) el.classList.remove('expanded');
       });
     }
 
-    list.classList.toggle('active',   shouldOpen);
+    list.classList.toggle('active',    shouldOpen);
     header.classList.toggle('expanded', shouldOpen);
     header.setAttribute('aria-expanded', String(shouldOpen));
 
     if (isMobileView() && shouldOpen) {
-      listEl.scrollTo({ top: header.offsetTop - 2, behavior: 'smooth' });
-    }
-  }
-
-  // Keep backward compat for any calls that don't have the listEl context
-  function toggleIsland(id) {
-    // Toggle in both lists — suffix '' for desktop, '-mob' for mobile
-    const desktopList = document.getElementById(`list-${id}`);
-    if (desktopList) {
-      const parentList = desktopList.closest('.island-list');
-      if (parentList) toggleIslandInList(parentList, id, '');
-    }
-    const mobList = document.getElementById(`list-${id}-mob`);
-    if (mobList) {
-      const parentList = mobList.closest('.island-list');
-      if (parentList) toggleIslandInList(parentList, id, '-mob');
+      islandListEl.scrollTo({ top: header.offsetTop - 2, behavior: 'smooth' });
     }
   }
 
@@ -1844,13 +1521,12 @@
 
       map.stop();
 
-      // ── Mobile: store bounds then open panel.
-      //    applyMobileState schedules flyToMobileVisible which uses the
-      //    bounds to fit AND centre the polygon in the visible strip.
+      // Mobile: open info panel then fit bounds in visible strip above sheet
       if (isMobileView()) {
         activeLastBounds = bounds;
         openPanel();
         flashLayerBorder(layer);
+        scheduleMobileFit(bounds);
         return;
       }
 
@@ -1922,42 +1598,32 @@
   }
 
   function clearSidebarSearch() {
-    const searchEl = getAreaSearchEl();
-    if (!searchEl) return;
-    searchEl.value = '';
+    if (!areaSearchEl) return;
+    areaSearchEl.value = '';
     syncSearchClearVisibility();
     filterSidebar();
-    searchEl.focus();
+    areaSearchEl.focus();
   }
 
-  // Show the clear (✕) button only when there's text to clear
   function syncSearchClearVisibility() {
-    const searchEl = getAreaSearchEl();
-    const wrap = searchEl?.closest('.search-input-wrapper');
+    const wrap = areaSearchEl?.closest('.search-input-wrapper');
     if (!wrap) return;
-    wrap.classList.toggle('has-value', Boolean(searchEl.value));
+    wrap.classList.toggle('has-value', Boolean(areaSearchEl?.value));
   }
 
   function filterSidebar() {
-    const searchEl = getAreaSearchEl();
-    const term = normalizeHawaiianText(searchEl?.value || '');
-    // Filter whichever island list is active
-    const targetListEl = isMobileView() ? islandListMobEl : islandListEl;
-    if (!targetListEl) return;
+    const term = normalizeHawaiianText(areaSearchEl?.value || '');
     let totalMatches = 0;
 
-    targetListEl.querySelectorAll('.island-group').forEach((group) => {
+    islandListEl.querySelectorAll('.island-group').forEach((group) => {
       const islandLabel = group.querySelector('.header-left span')?.textContent || '';
       const islandMatch = term !== '' && normalizeHawaiianText(islandLabel).includes(term);
-      let hasMatch      = false;
+      let hasMatch = false;
 
       group.querySelectorAll('.area-item').forEach((item) => {
         const matches = term === '' || islandMatch || normalizeHawaiianText(item.textContent).includes(term);
         item.style.display = matches ? '' : 'none';
-        if (matches) {
-          hasMatch = true;
-          totalMatches += 1;
-        }
+        if (matches) { hasMatch = true; totalMatches++; }
       });
 
       const list   = group.querySelector('.area-list');
@@ -1978,14 +1644,14 @@
       }
     });
 
-    let notice = targetListEl.querySelector('#search-no-results');
+    let notice = islandListEl.querySelector('#search-no-results');
     if (!notice) {
       notice = document.createElement('div');
       notice.id = 'search-no-results';
       notice.className = 'loading-notice';
       notice.textContent = 'No matching areas found';
       notice.hidden = true;
-      targetListEl.appendChild(notice);
+      islandListEl.appendChild(notice);
     }
     notice.hidden = !(term !== '' && totalMatches === 0);
   }
@@ -2153,145 +1819,107 @@
 
       // Signal to screen readers that the list is ready
       islandListEl?.removeAttribute('aria-busy');
-      islandListMobEl?.removeAttribute('aria-busy');
 
-      // Append "About this map" button at the bottom of both island lists
-      [islandListEl, islandListMobEl].forEach((listEl) => {
-        if (!listEl) return;
+      // Append "About this map" button at the bottom of the island list
+      if (islandListEl) {
         const aboutBtn = document.createElement('button');
         aboutBtn.type = 'button';
         aboutBtn.className = 'about-map-btn';
         aboutBtn.innerHTML = '<span class="about-map-btn__icon">ℹ</span><span class="about-map-btn__label">About this map</span>';
         aboutBtn.addEventListener('click', openAboutPane);
-        listEl.appendChild(aboutBtn);
-      });
+        islandListEl.appendChild(aboutBtn);
+      }
 
     } catch (err) {
       console.error('[haMMA] Failed to load service data:', err);
       islandListEl?.removeAttribute('aria-busy');
-      islandListMobEl?.removeAttribute('aria-busy');
 
-      const errorHtml = `
-        <div class="error-notice">
-          <p>Unable to load marine areas. Please check your connection.</p>
-          <button class="retry-btn retry-load-btn" type="button">Try again</button>
-        </div>`;
-
-      if (islandListEl) islandListEl.innerHTML = errorHtml;
-      if (islandListMobEl) islandListMobEl.innerHTML = errorHtml;
-
-      document.querySelectorAll('.retry-load-btn')?.forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const loadingHtml = '<div class="loading-notice" role="status">Loading marine areas…</div>';
-          if (islandListEl)    { islandListEl.innerHTML = loadingHtml;    islandListEl.setAttribute('aria-busy', 'true'); }
-          if (islandListMobEl) { islandListMobEl.innerHTML = loadingHtml; islandListMobEl.setAttribute('aria-busy', 'true'); }
+      if (islandListEl) {
+        islandListEl.innerHTML = `
+          <div class="error-notice">
+            <p>Unable to load marine areas. Please check your connection.</p>
+            <button class="retry-btn" type="button" id="retry-load-btn">Try again</button>
+          </div>`;
+        document.getElementById('retry-load-btn')?.addEventListener('click', () => {
+          islandListEl.innerHTML = '<div class="loading-notice" role="status">Loading marine areas…</div>';
+          islandListEl.setAttribute('aria-busy', 'true');
           loadAllFromSingleService();
         });
-      });
+      }
     }
   }
 
 
   // ── 19. EVENT WIRING ─────────────────────────────────────────
 
-  // Desktop search
+  // Search (single input)
   areaSearchEl?.addEventListener('input',  () => { syncSearchClearVisibility(); filterSidebar(); });
   searchClearEl?.addEventListener('click', clearSidebarSearch);
 
-  // Mobile search
-  areaSearchMobEl?.addEventListener('input',  () => { syncSearchClearVisibility(); filterSidebar(); });
-  searchClearMobEl?.addEventListener('click', clearSidebarSearch);
-
   // Mobile back button
-  document.getElementById('sheet-back-btn')?.addEventListener('click', () => {
-    applyMobileState(infoToListState(mobileState));
-  });
+  document.getElementById('sheet-back-btn')?.addEventListener('click', openListView);
 
-  // Mobile drag — single drag target: the drag tab
-  document.getElementById('sheet-drag-tab')?.addEventListener(
-    'touchstart', onSheetDragStart, { passive: true }
-  );
-  // Also allow dragging from the banner area (not over buttons)
-  document.getElementById('sheet-list-banner')?.addEventListener(
-    'touchstart', onSheetDragStart, { passive: true }
-  );
-  document.getElementById('sheet-info-banner')?.addEventListener(
-    'touchstart', onSheetDragStart, { passive: true }
-  );
+  // Mobile tap-toggle handles
+  document.getElementById('sheet-handle-btn')?.addEventListener('click', toggleExpanded);
+  document.getElementById('info-handle-btn')?.addEventListener('click', toggleExpanded);
 
-  // Tap drag tab when hidden → restore
-  document.getElementById('sheet-drag-tab')?.addEventListener('click', () => {
-    if (mobileState === 'hidden') {
-      const view = sheetEl?.dataset.view || 'list';
-      applyMobileState(view === 'info' ? 'info-half' : 'list-open');
+  // Info panel — delegated listener for all dynamic content
+  infoContentEl?.addEventListener('click', (e) => {
+    const tabBtn = e.target.closest('[data-tab-target]');
+    if (tabBtn) { showTab(tabBtn, tabBtn.dataset.tabTarget); return; }
+
+    const flashPill = e.target.closest('[data-flash-area]');
+    if (flashPill) { flashFeatureByName(flashPill.dataset.flashArea); return; }
+
+    const dismissBtn = e.target.closest('.overlap-notice__dismiss');
+    if (dismissBtn) { dismissBtn.closest('.overlap-notice')?.remove(); return; }
+
+    const accordionToggle = e.target.closest('[data-action="toggle-summary"]');
+    if (accordionToggle) { toggleSummaryAccordion(accordionToggle); return; }
+
+    const navBtn = e.target.closest('.mmcard__image-nav');
+    if (navBtn) {
+      const wrap = navBtn.closest('.mmcard__image-wrap');
+      const img  = wrap?.querySelector('.mmcard__image');
+      if (!wrap || !img) return;
+
+      const images = (navBtn.dataset.images || '')
+        .split('|')
+        .filter(Boolean)
+        .map((encoded) => {
+          try { return JSON.parse(decodeURIComponent(encoded)); }
+          catch (_err) { return null; }
+        })
+        .filter((img) => img?.url);
+      if (images.length < 2) return;
+
+      const direction = Number(navBtn.dataset.direction || 1);
+      const cur  = Number(wrap.dataset.carouselIndex || 0);
+      const next = (cur + direction + images.length) % images.length;
+      wrap.dataset.carouselIndex = String(next);
+      img.src = images[next].url;
+      img.alt = images[next].alt || 'Area image';
+      wrap.classList.remove('is-image-failed');
+      const fallback = wrap.querySelector('.mmcard__image-fallback');
+      if (fallback) fallback.hidden = true;
+      wrap.querySelectorAll('.mmcard__image-dot').forEach((dot, i) => {
+        dot.classList.toggle('is-active', i === next);
+      });
     }
   });
 
-  // Info panel — single delegated listener for all dynamic content
-  // Covers BOTH desktop and mobile info content elements
-  function wireInfoContent(el) {
-    if (!el) return;
-    el.addEventListener('click', (e) => {
-      const tabBtn = e.target.closest('[data-tab-target]');
-      if (tabBtn) { showTab(tabBtn, tabBtn.dataset.tabTarget); return; }
+  infoContentEl?.addEventListener('error', (e) => {
+    const imageEl = e.target.closest('.mmcard__image');
+    if (!imageEl) return;
+    const wrap = imageEl.closest('.mmcard__image-wrap');
+    if (!wrap) return;
+    imageEl.style.display = 'none';
+    wrap.classList.add('is-image-failed');
+    const fallback = wrap.querySelector('.mmcard__image-fallback');
+    if (fallback) fallback.hidden = false;
+  }, true);
 
-      const flashPill = e.target.closest('[data-flash-area]');
-      if (flashPill) { flashFeatureByName(flashPill.dataset.flashArea); return; }
-
-      const dismissBtn = e.target.closest('.overlap-notice__dismiss');
-      if (dismissBtn) { dismissBtn.closest('.overlap-notice')?.remove(); return; }
-
-      const accordionToggle = e.target.closest('[data-action="toggle-summary"]');
-      if (accordionToggle) { toggleSummaryAccordion(accordionToggle); return; }
-
-      const navBtn = e.target.closest('.mmcard__image-nav');
-      if (navBtn) {
-        const wrap = navBtn.closest('.mmcard__image-wrap');
-        const img  = wrap?.querySelector('.mmcard__image');
-        if (!wrap || !img) return;
-
-        const images = (navBtn.dataset.images || '')
-          .split('|')
-          .filter(Boolean)
-          .map((encoded) => {
-            try { return JSON.parse(decodeURIComponent(encoded)); }
-            catch (_err) { return null; }
-          })
-          .filter((img) => img?.url);
-        if (images.length < 2) return;
-
-        const direction = Number(navBtn.dataset.direction || 1);
-        const cur  = Number(wrap.dataset.carouselIndex || 0);
-        const next = (cur + direction + images.length) % images.length;
-        wrap.dataset.carouselIndex = String(next);
-        img.src = images[next].url;
-        img.alt = images[next].alt || 'Area image';
-        wrap.classList.remove('is-image-failed');
-        const fallback = wrap.querySelector('.mmcard__image-fallback');
-        if (fallback) fallback.hidden = true;
-
-        wrap.querySelectorAll('.mmcard__image-dot').forEach((dot, i) => {
-          dot.classList.toggle('is-active', i === next);
-        });
-      }
-    });
-
-    el.addEventListener('error', (e) => {
-      const imageEl = e.target.closest('.mmcard__image');
-      if (!imageEl) return;
-      const wrap = imageEl.closest('.mmcard__image-wrap');
-      if (!wrap) return;
-      imageEl.style.display = 'none';
-      wrap.classList.add('is-image-failed');
-      const fallback = wrap.querySelector('.mmcard__image-fallback');
-      if (fallback) fallback.hidden = false;
-    }, true);
-  }
-
-  wireInfoContent(infoContentEl);
-  wireInfoContent(infoContentMobEl);
-
-  // Map events
+  // Map click — desktop only clears selection
   map.on('click', () => { if (!isMobileView()) clearMapSelection({ fromClick: true }); });
 
   // Resize — debounced
