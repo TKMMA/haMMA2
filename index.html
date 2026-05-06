@@ -140,41 +140,37 @@
     <section class="about-pane__section">
       <h3>Why this exists</h3>
       <p>Since the 1960s, the Hawaiʻi Division of Aquatic Resources (DAR) has established
-      place-specific regulations for 90+ marine and freshwater areas across the state —
+      place-specific fishing rules for dozens of marine and freshwater areas across the state. These include
       Marine Life Conservation Districts, Fish Replenishment Areas, Community-Based
       Subsistence Fishing Areas, Public Fishing Areas, and more.</p>
       <p>These areas frequently overlap, and their rules are scattered across dense legal
       documents that are hard to find and harder to read. Someone anchored near Miloliʻi
       might be inside the West Hawaiʻi RFMA, the Miloliʻi CBSFA, the Miloliʻi FRA, and
-      one or more sub-zones simultaneously — each with different rules for gear, species,
+      one or more sub-zones simultaneously.  Each of these has different rules for gear, species,
       seasons, and activities.</p>
       <p>haMMA makes that clear at a glance, on a phone, in the field.</p>
     </section>
 
     <section class="about-pane__section">
       <h3>How to use it</h3>
-      <p><strong>Tap the map</strong> to see every managed area at that exact spot and the
-      rules that apply there — including combined rules when multiple areas overlap.</p>
-      <p><strong>Browse the list</strong> to find a specific area by island and name, then
+      <p><strong>Tap the map</strong> to see rules for each area and a dynamically populated combined rules report when multiple areas overlap.</p>
+      <p><strong>Search or browse the list</strong> to find specific area by name or island, then
       tap it to fly to it on the map and open its rules card.</p>
     </section>
 
     <section class="about-pane__section">
       <h3>The data</h3>
-      <p>Rules are sourced from official Hawaii Administrative Rules (HAR) and Hawaii
-      Revised Statutes (HRS) documents. A custom pipeline reads each source PDF directly
-      from government servers and organizes the rule text into a structured GIS layer —
-      a hosted ArcGIS Online feature service maintained by the project team. Rule text
-      is written in plain English, and Hawaiian species names use correct diacritical
-      markings (ʻokina and kahakō) even when the source documents do not.</p>
+      <p>Rules are sourced from official Hawaiʻi Administrative Rules (HAR) and Hawaiʻi
+      Revised Statutes (HRS) documents. Rules and info data are populated by a custom python script which reads each source PDF directly
+      from government servers and organizes the rule text into plain English. This information is then imported into an ArcGIS feature service to populate the informational cards of the map.</p>
       <p>When in doubt, always verify rules directly with DAR or the official legal documents
-      linked in the Laws tab of each area card.</p>
+      linked in the Sources tab of each area card.</p>
     </section>
 
     <section class="about-pane__section">
       <h3>Built by</h3>
       <p>Tyler Kueffner, for DAR and for Hawaiʻi's fishers and ocean users. The app is
-      written from scratch — no framework, just vanilla JavaScript, CSS, and
+      written from scratch with no framework using vanilla JavaScript, CSS, and
       <a href="https://leafletjs.com" target="_blank" rel="noopener" class="about-pane__link">Leaflet.js</a>
       for the map.</p>
       <p>Questions, data corrections, or bug reports:
