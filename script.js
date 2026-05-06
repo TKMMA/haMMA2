@@ -1,5 +1,8 @@
 /* ============================================================
    haMMA — Hawaii Managed Marine Areas
+   Copyright (c) 2026 Tyler Kueffner
+   All rights reserved. Copying, modification, or distribution of this software is prohibited without the copyright holder's consent.
+   
    script.js  |  Full refactor
 
    Sections
@@ -174,13 +177,20 @@
 
   // ── 3. DOM REFERENCES ────────────────────────────────────────
   const mapInterfaceEl = document.querySelector('.map-interface');
-  const paneStageEl    = document.getElementById('pane-stage');
-  const mapSidebarEl   = document.getElementById('map-sidebar');
-  const infoSidebarEl  = document.getElementById('info-sidebar');
-  const islandListEl   = document.getElementById('island-list');
-  const infoContentEl  = document.getElementById('info-content');
-  const areaSearchEl   = document.getElementById('area-search');
+  const mapSidebarEl   = document.getElementById('map-sidebar');   // desktop only
+  const infoSidebarEl  = document.getElementById('info-sidebar');  // desktop only
+  const sheetEl        = document.getElementById('sheet');         // mobile only
+  // On mobile, content lives in the sheet. On desktop, in the sidebar panels.
+  // islandListEl / infoContentEl / areaSearchEl point to the correct element
+  // depending on viewport — resolved after boot via getActiveEls() helpers.
+  const islandListEl   = document.getElementById('island-list');          // desktop
+  const islandListMobEl = document.getElementById('island-list-mobile');  // mobile
+  const infoContentEl  = document.getElementById('info-content');         // desktop
+  const infoContentMobEl = document.getElementById('info-content-mobile');// mobile
+  const areaSearchEl   = document.getElementById('area-search');          // desktop
+  const areaSearchMobEl = document.getElementById('area-search-mobile');  // mobile
   const searchClearEl  = document.getElementById('search-clear-btn');
+  const searchClearMobEl = document.getElementById('search-clear-btn-mobile');
 
 
   // ── 4. UTILITIES ─────────────────────────────────────────────
@@ -415,13 +425,18 @@
   // ── 7. RESPONSIVE / LAYOUT HELPERS ───────────────────────────
   const isMobileView = () => MOBILE_BREAKPOINT.matches;
 
+  // Active DOM element helpers — return the right element for the current viewport
+  function getIslandListEl()  { return isMobileView() ? islandListMobEl  : islandListEl; }
+  function getInfoContentEl() { return isMobileView() ? infoContentMobEl : infoContentEl; }
+  function getAreaSearchEl()  { return isMobileView() ? areaSearchMobEl  : areaSearchEl; }
+
   function syncMobileBrowserInset() {
-    if (!paneStageEl) return;
+    if (!sheetEl) return;
     const vv = window.visualViewport;
     const inset = vv
       ? Math.max(0, Math.round(window.innerHeight - (vv.height + vv.offsetTop)))
       : 0;
-    paneStageEl.style.setProperty('--browser-offset', `${inset}px`);
+    sheetEl.style.setProperty('--browser-offset', `${inset}px`);
   }
 
   function syncLeafletControlPosition() {
@@ -447,113 +462,89 @@
   // ── 8. MOBILE STATE MACHINE ──────────────────────────────────
   //
   // Single source of truth: mobileState
-  //   'hidden'    — sheet peeks (only banner visible), list panel showing
-  //   'list-open' — list panel open at half height
+  //   'hidden'    — sheet peeks (only banner + drag tab visible)
+  //   'list-open' — list panel at half height
   //   'list-full' — list panel at full height
-  //   'info-half' — info panel open at half height
+  //   'info-half' — info panel at half height
   //   'info-full' — info panel at full height
   //
-  // applyMobileState() is the ONLY place that touches mobile CSS classes.
-  // Everything else just calls applyMobileState(nextState).
+  // applyMobileState() is the ONLY place that touches #sheet attributes.
+  // It sets two attributes:
+  //   data-snap  = "hidden" | "open" | "full"
+  //   data-view  = "list"   | "info"
+  // CSS handles all visual output from those two attributes — no X transform.
 
   let mobileState    = 'list-open';
-  let lastListState  = 'list-open'; // remembered when switching to info view
-  let activeLastBounds = null;      // L.LatLngBounds of current selection
-  let _pendingMoveendHandler = null; // moveend handler waiting on flyToBounds
+  let lastListState  = 'list-open';
+  let activeLastBounds = null;
+  let _pendingMoveendHandler = null;
 
-  // Snap positions as a fraction of screen height (stage Y offset)
-  // These mirror the CSS custom property values in style.css
+  // Snap Y positions — used ONLY for drag math (reading current transform)
+  // CSS drives actual snap positions. These must mirror style.css values.
   function snapY(state) {
     const H = window.innerHeight;
-    const bh = 58; // --sheet-banner-h (brand panel / info header height)
-    if (state === 'hidden')    return H * 0.92 - bh;
+    const bh = 58; // --sheet-banner-h
+    const th = 22; // --sheet-tab-h
+    if (state === 'hidden')    return H - bh - th;
     if (state === 'list-open') return H * 0.50 - bh;
-    if (state === 'list-full') return H * 0.03;       // near-full: grip tab still peeks
+    if (state === 'list-full') return H * 0.03;
     if (state === 'info-half') return H * 0.50 - bh;
-    if (state === 'info-full') return H * 0.22;       // 22% map visible for context
-    return H * 0.92 - bh;
+    if (state === 'info-full') return H * 0.22;
+    return H - bh - th;
   }
 
-  // Map an info state to its matching list state (same Y height)
   function infoToListState(state) {
     if (state === 'info-full') return 'list-full';
-    return 'list-open'; // info-half → list-open
+    return 'list-open';
   }
 
   function applyMobileState(nextState, opts = {}) {
-    if (!isMobileView()) return;
+    if (!isMobileView() || !sheetEl) return;
 
     const prevState = mobileState;
     mobileState     = nextState;
 
-    const stage = paneStageEl;
-    const list  = mapSidebarEl;
-    const info  = infoSidebarEl;
-    if (!stage || !list || !info) return;
+    // Derive data-view and data-snap from the state name
+    const isInfoView = nextState === 'info-half' || nextState === 'info-full' ||
+                       (nextState === 'hidden' && (
+                         prevState === 'info-half' || prevState === 'info-full' ||
+                         sheetEl.dataset.view === 'info'
+                       ));
 
-    // 'hidden' from the info drag zone means info-pane collapsed, NOT a pane switch.
-    // Preserve is-info-view if we're collapsing from an info state.
-    const wasInfoView = prevState === 'info-half' || prevState === 'info-full' ||
-                        (prevState === 'hidden' && stage.classList.contains('is-info-view'));
-    const isInfoView  = nextState === 'info-half' || nextState === 'info-full' ||
-                        (nextState === 'hidden' && wasInfoView);
+    sheetEl.dataset.view = isInfoView ? 'info' : 'list';
 
-    // ── Remember list state when transitioning into info view ──
-    if (!wasInfoView && isInfoView) {
-      // Entering info: remember which list height we came from
-      lastListState = (prevState === 'list-full') ? 'list-full' : 'list-open';
-    }
-
-    // ── X position ─────────────────────────────────────────────
-    stage.classList.toggle('is-info-view', isInfoView);
-
-    // ── Y position ─────────────────────────────────────────────
-    // When going back to list from info, match the info panel's height
-    let yState = nextState;
-    if (wasInfoView && !isInfoView && nextState !== 'hidden') {
-      yState = infoToListState(prevState);
-      mobileState = yState; // keep state consistent
-    }
-
-    stage.classList.remove('is-hidden', 'is-open', 'is-full');
-    if (yState === 'hidden') {
-      stage.classList.add('is-hidden');
-    } else if (yState === 'list-open' || yState === 'info-half') {
-      stage.classList.add('is-open');
+    if (nextState === 'hidden') {
+      sheetEl.dataset.snap = 'hidden';
+    } else if (nextState === 'list-open' || nextState === 'info-half') {
+      sheetEl.dataset.snap = 'open';
     } else {
-      stage.classList.add('is-full');
+      sheetEl.dataset.snap = 'full';
     }
 
-    // ── List panel ─────────────────────────────────────────────
-    list.classList.toggle('is-collapsed', yState === 'hidden');
+    // Remember list state when entering info view
+    if ((prevState === 'list-open' || prevState === 'list-full') && isInfoView) {
+      lastListState = prevState;
+    }
 
-    // ── Info panel visibility ───────────────────────────────────
-    // Keep the info panel active whenever we're in info-view (including
-    // collapsed 'hidden' state) so the banner tab remains tappable.
-    info.classList.toggle('is-offscreen', !isInfoView);
-    info.classList.toggle('active',       isInfoView);
-
-    // ── Schedule fly-to after sheet settles ─────────────────────
-    const shouldRecentreInfoHalf = isInfoView && nextState === 'info-half' && !opts.skipRecentre;
-    const returningFromFullToHalf = prevState === 'info-full' && nextState === 'info-half';
-    if ((shouldRecentreInfoHalf || returningFromFullToHalf) && lastSelectionSource === 'menu') {
+    // Schedule fly-to after sheet settles
+    const shouldRecentre = isInfoView && nextState === 'info-half' && !opts.skipRecentre;
+    const returningFullToHalf = prevState === 'info-full' && nextState === 'info-half';
+    if ((shouldRecentre || returningFullToHalf) && lastSelectionSource === 'menu') {
       scheduleMobileFly(activeLastBounds, activeLastLatlng);
     }
   }
 
   function syncResponsiveSidebarState() {
-    if (!mapSidebarEl) return;
-
     if (isMobileView()) {
-      // Re-apply current mobileState to restore correct classes
-      // (called on resize / orientation change)
+      // Show the sheet, hide desktop panels (CSS handles this too but be explicit)
+      if (sheetEl) sheetEl.style.display = '';
       applyMobileState(mobileState, { skipRecentre: true });
       syncMobileBrowserInset();
     } else {
-      // Desktop — clear all mobile classes
-      paneStageEl?.classList.remove('is-hidden', 'is-open', 'is-full', 'is-info-view', 'is-dragging');
-      mapSidebarEl.classList.remove('is-collapsed');
-      infoSidebarEl.classList.remove('is-offscreen');
+      // Desktop — hide the sheet, desktop panels visible via CSS
+      if (sheetEl) sheetEl.style.display = 'none';
+      if (mapSidebarEl)  mapSidebarEl.classList.remove('is-collapsed');
+      if (infoSidebarEl) infoSidebarEl.classList.remove('is-offscreen');
       setMapSidebarDesktopState();
     }
 
@@ -588,64 +579,52 @@
 
 
   // ── DRAG BEHAVIOUR ───────────────────────────────────────────
-  // The drag zone in each banner directly controls the pane-stage Y
-  // transform in real time. On release it snaps to the nearest valid
-  // state using velocity projection.
+  // The drag tab controls the sheet Y transform in real time.
+  // No X-axis logic — panel switching is handled by data-view attribute.
+  // Two-phase system: passive observation first, active control only after
+  // a clear vertical drag is confirmed. Scroll containers are never blocked.
 
-  // Snap states available from each view
   const LIST_SNAPS = ['hidden', 'list-open', 'list-full'];
   const INFO_SNAPS = ['hidden', 'info-half', 'info-full'];
 
-  let _drag = null; // active drag session
-
-  // ── DRAG SYSTEM ──────────────────────────────────────────────
-  // Pattern: touchstart on banner zones (passive) records intent.
-  // A passive touchmove listener on document tracks position until
-  // a clear vertical drag is confirmed (>8px vertical, not horizontal).
-  // Only then do we add a non-passive listener to take full control.
-  // This guarantees scroll containers are never blocked until we are
-  // certain the user intends to drag the sheet.
+  let _drag = null;
 
   function _cleanupDrag() {
     document.removeEventListener('touchmove', _passiveDragWatch, { passive: true });
     document.removeEventListener('touchmove', _activeDragMove);
     document.removeEventListener('touchend',  _dragEnd);
     document.removeEventListener('touchcancel', _dragEnd);
-    paneStageEl?.classList.remove('is-dragging');
+    sheetEl?.classList.remove('is-dragging');
     _drag = null;
   }
 
-  // Phase 1: passive observation — does NOT block scrolling
+  // Phase 1: passive — does NOT block scrolling
   function _passiveDragWatch(e) {
     if (!_drag) { _cleanupDrag(); return; }
     const touch     = (e.touches || [e])[0];
     const absDeltaY = Math.abs(touch.clientY - _drag.startY);
     const absDeltaX = Math.abs(touch.clientX - _drag.startX);
 
-    if (absDeltaY < 8) return; // still ambiguous
+    if (absDeltaY < 8) return;
 
     if (absDeltaX > absDeltaY * 1.2) {
-      // Clearly horizontal — cancel drag intent entirely
       _cleanupDrag();
       return;
     }
 
-    // Clearly vertical drag confirmed — upgrade to active drag
+    // Confirmed vertical drag — upgrade to active
     document.removeEventListener('touchmove', _passiveDragWatch, { passive: true });
 
-    // Now read the pane position and lock in the base
-    paneStageEl.classList.add('is-dragging');
-    const matrix = new DOMMatrix(getComputedStyle(paneStageEl).transform);
-    _drag.baseY    = matrix.f;
-    _drag.currentX = matrix.e;
-    _drag.lastY    = matrix.f;
+    sheetEl.classList.add('is-dragging');
+    const matrix  = new DOMMatrix(getComputedStyle(sheetEl).transform);
+    _drag.baseY   = matrix.f;
+    _drag.lastY   = matrix.f;
     _drag.lastTime = Date.now();
 
-    // Add non-passive active handler
     document.addEventListener('touchmove', _activeDragMove, { passive: false });
   }
 
-  // Phase 2: active drag — has control, can preventDefault
+  // Phase 2: active drag
   function _activeDragMove(e) {
     if (!_drag) return;
     e.preventDefault();
@@ -653,7 +632,8 @@
     const touch    = (e.touches || [e])[0];
     const deltaY   = touch.clientY - _drag.startY;
     const rawY     = _drag.baseY + deltaY;
-    const minY     = snapY('list-full');
+    const view     = sheetEl.dataset.view || 'list';
+    const minY     = snapY(view === 'info' ? 'info-full' : 'list-full');
     const maxY     = snapY('hidden');
     const clampedY = Math.max(minY, Math.min(maxY, rawY));
 
@@ -663,26 +643,24 @@
     _drag.lastY    = clampedY;
     _drag.lastTime = now;
 
-    paneStageEl.style.transform = `translate(${_drag.currentX}px, ${clampedY}px)`;
+    sheetEl.style.transform = `translateY(${clampedY}px)`;
   }
 
   // Drag end — snap to nearest state
   function _dragEnd() {
     if (!_drag) return;
-    const wasActive = paneStageEl.classList.contains('is-dragging');
-    const currentY  = _drag.lastY;
-    const velocity  = _drag.velocity;
-    const panel     = _drag.panel;
+    const wasActive  = sheetEl.classList.contains('is-dragging');
+    const currentY   = _drag.lastY;
+    const velocity   = _drag.velocity;
     _cleanupDrag();
 
-    if (!wasActive) return; // tap, not drag — nothing to snap
+    if (!wasActive) return;
 
-    paneStageEl.style.transform = '';
-    // Project 180ms forward to honour flick momentum
+    sheetEl.style.transform = '';
     const projectedY = currentY + velocity * 180;
 
-    // Snap to nearest valid state for this panel
-    const snaps = panel === 'info' ? INFO_SNAPS : LIST_SNAPS;
+    const view  = sheetEl.dataset.view || 'list';
+    const snaps = view === 'info' ? INFO_SNAPS : LIST_SNAPS;
     const nearest = snaps
       .map((s) => ({ state: s, dist: Math.abs(projectedY - snapY(s)) }))
       .sort((a, b) => a.dist - b.dist)[0].state;
@@ -690,50 +668,28 @@
     applyMobileState(nearest);
   }
 
-  function onBannerDragStart(e, panel) {
-    if (!isMobileView() || !paneStageEl) return;
+  function onSheetDragStart(e) {
+    if (!isMobileView() || !sheetEl) return;
     if (_drag) return;
 
-    // Don't intercept taps on interactive children (back button, links, pills)
     const firstTouch = (e.touches || [e])[0];
     const targetEl   = firstTouch
       ? (document.elementFromPoint(firstTouch.clientX, firstTouch.clientY) || firstTouch.target)
       : e.target;
     if (targetEl?.closest('button, a')) return;
 
-    // Record touch start. Do NOT touch paneStageEl yet — wait for confirmation.
     _drag = {
-      panel,
       startX:   firstTouch.clientX,
       startY:   firstTouch.clientY,
       baseY:    0,
-      currentX: 0,
       lastY:    0,
       lastTime: Date.now(),
       velocity: 0,
     };
 
-    // Phase 1: passive listener — browser can scroll freely
     document.addEventListener('touchmove', _passiveDragWatch, { passive: true });
     document.addEventListener('touchend',    _dragEnd, { passive: false });
     document.addEventListener('touchcancel', _dragEnd, { passive: false });
-  }
-
-  function wireSheetBannerDrag(zoneId, panel, opts = {}) {
-    const zone = document.getElementById(zoneId);
-    if (!zone) return;
-    // Only touchstart on the zone — move/end are handled at document level
-    // once a drag is confirmed. This means scroll containers are never blocked.
-    zone.addEventListener('touchstart', (e) => onBannerDragStart(e, panel), { passive: true });
-
-    // Tap on the info tab when collapsed → restore to info-half
-    if (panel === 'info' && opts.enableRestoreTap) {
-      zone.addEventListener('click', () => {
-        if (mobileState === 'hidden' && paneStageEl?.classList.contains('is-info-view')) {
-          applyMobileState('info-half');
-        }
-      });
-    }
   }
 
 
@@ -791,7 +747,7 @@
 
   function getMobileVisibleMapStrip() {
     const mapRect = map.getContainer().getBoundingClientRect();
-    const stageRect = paneStageEl?.getBoundingClientRect();
+    const stageRect = sheetEl?.getBoundingClientRect();
     const sheetTop = stageRect ? Math.max(mapRect.top, stageRect.top) : (mapRect.top + mapRect.height * 0.5);
     const sidePadding = 16;
     const topPadding = 10;
@@ -1109,8 +1065,6 @@
     setActiveAreaItem(null, null);
 
     if (isMobileView()) {
-      // Clear is-info-view so x-position snaps back to list pane
-      paneStageEl?.classList.remove('is-info-view');
       applyMobileState('list-open');
     } else {
       closeInfoPanel();
@@ -1643,15 +1597,18 @@
 
     // Update header titles
     const desktopTitle = document.getElementById('info-banner-title');
-    const mobileTitle  = document.getElementById('info-banner-title-mobile');
+    const mobileTitle  = document.getElementById('sheet-info-title');
     if (desktopTitle) desktopTitle.textContent = 'About';
     if (mobileTitle)  mobileTitle.textContent  = 'About';
 
-    // Render into info panel
-    infoContentEl.innerHTML = `
-      <div class="mmpopup">
-        <div class="mmpopup__scroll">${README_HTML}</div>
-      </div>`;
+    // Render into the active info content element
+    const target = getInfoContentEl();
+    if (target) {
+      target.innerHTML = `
+        <div class="mmpopup">
+          <div class="mmpopup__scroll">${README_HTML}</div>
+        </div>`;
+    }
 
     // Open the info panel on mobile / desktop
     if (isMobileView()) {
@@ -1691,18 +1648,21 @@
       });
       if (targetLayer) overlapCount = countOverlapsForFeature(targetLayer);
     }
-    infoContentEl.innerHTML = isMulti
+    const target = getInfoContentEl();
+    if (!target) return;
+
+    target.innerHTML = isMulti
       ? renderOverlapInfoPane(features)
       : renderSingleAreaInfoPane(features[0], overlapCount);
 
-    infoContentEl.querySelector('.mmpopup__scroll').scrollTop = 0;
+    target.querySelector('.mmpopup__scroll').scrollTop = 0;
 
     // Sync the panel header title (desktop) and mobile banner title
     const panelTitle = isMulti
       ? `${count} Area${count === 1 ? '' : 's'} Selected`
       : areaName;
     const desktopTitle = document.getElementById('info-banner-title');
-    const mobileTitle  = document.getElementById('info-banner-title-mobile');
+    const mobileTitle  = document.getElementById('sheet-info-title');
     if (desktopTitle) desktopTitle.textContent = panelTitle;
     if (mobileTitle)  mobileTitle.textContent  = panelTitle;
 
@@ -1748,26 +1708,33 @@
 
 
   // ── 16. SIDEBAR — POPULATION ─────────────────────────────────
-  // Receives pre-sorted names so it doesn't need to re-sort on every render.
+  // Populates BOTH island lists (desktop and mobile sheet) from a single call.
   function populateSidebar(islandName, sortedNames) {
-    if (!islandListEl) return;
+    _populateIslandList(islandListEl,    islandName, sortedNames);
+    _populateIslandList(islandListMobEl, islandName, sortedNames);
+  }
 
-    const notice = document.getElementById('loading-notice');
+  function _populateIslandList(listEl, islandName, sortedNames) {
+    if (!listEl) return;
+
+    const notice = listEl.querySelector('.loading-notice');
     if (notice) notice.remove();
 
     const islandId = islandName.replace(/[^a-zA-Z0-9]/g, '');
+    // Use a suffix to avoid ID collisions between desktop and mobile lists
+    const isMob    = listEl === islandListMobEl;
+    const suffix   = isMob ? '-mob' : '';
     const fragment = document.createDocumentFragment();
 
     const group       = document.createElement('div');
     group.className   = 'island-group';
 
-    // <button> instead of <div> — keyboard-reachable by default
     const header      = document.createElement('button');
     header.className  = 'island-header';
-    header.id         = `header-${islandId}`;
+    header.id         = `header-${islandId}${suffix}`;
     header.setAttribute('aria-expanded', 'false');
-    header.setAttribute('aria-controls',  `list-${islandId}`);
-    header.addEventListener('click', () => toggleIsland(islandId));
+    header.setAttribute('aria-controls',  `list-${islandId}${suffix}`);
+    header.addEventListener('click', () => toggleIslandInList(listEl, islandId, suffix));
 
     const headerLeft      = document.createElement('div');
     headerLeft.className  = 'header-left';
@@ -1785,7 +1752,7 @@
     header.append(headerLeft, chevron);
 
     const list      = document.createElement('div');
-    list.id         = `list-${islandId}`;
+    list.id         = `list-${islandId}${suffix}`;
     list.className  = 'area-list';
     list.setAttribute('role', 'list');
 
@@ -1802,7 +1769,7 @@
       item.addEventListener('click',      () => zoomToArea(islandName, areaName));
       item.addEventListener('keydown',    (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault(); // stop Space from scrolling the list
+          e.preventDefault();
           zoomToArea(islandName, areaName);
         }
       });
@@ -1814,25 +1781,25 @@
 
     group.append(header, list);
     fragment.appendChild(group);
-    islandListEl.appendChild(fragment);
+    listEl.appendChild(fragment);
   }
 
 
   // ── 17. SIDEBAR — INTERACTIONS ───────────────────────────────
-  function toggleIsland(id) {
-    const list   = document.getElementById(`list-${id}`);
-    const header = document.getElementById(`header-${id}`);
+  function toggleIslandInList(listEl, id, suffix) {
+    const list   = listEl.querySelector(`#list-${id}${suffix}`);
+    const header = listEl.querySelector(`#header-${id}${suffix}`);
     if (!list || !header) return;
 
     const shouldOpen = !list.classList.contains('active');
 
-    // On mobile: enforce single-expand (close others before opening)
+    // On mobile: enforce single-expand
     if (isMobileView()) {
-      document.querySelectorAll('.area-list.active').forEach((el) => {
-        if (el.id !== `list-${id}`) el.classList.remove('active');
+      listEl.querySelectorAll('.area-list.active').forEach((el) => {
+        if (el.id !== `list-${id}${suffix}`) el.classList.remove('active');
       });
-      document.querySelectorAll('.island-header.expanded').forEach((el) => {
-        if (el.id !== `header-${id}`) el.classList.remove('expanded');
+      listEl.querySelectorAll('.island-header.expanded').forEach((el) => {
+        if (el.id !== `header-${id}${suffix}`) el.classList.remove('expanded');
       });
     }
 
@@ -1841,7 +1808,22 @@
     header.setAttribute('aria-expanded', String(shouldOpen));
 
     if (isMobileView() && shouldOpen) {
-      islandListEl?.scrollTo({ top: header.offsetTop - 2, behavior: 'smooth' });
+      listEl.scrollTo({ top: header.offsetTop - 2, behavior: 'smooth' });
+    }
+  }
+
+  // Keep backward compat for any calls that don't have the listEl context
+  function toggleIsland(id) {
+    // Toggle in both lists — suffix '' for desktop, '-mob' for mobile
+    const desktopList = document.getElementById(`list-${id}`);
+    if (desktopList) {
+      const parentList = desktopList.closest('.island-list');
+      if (parentList) toggleIslandInList(parentList, id, '');
+    }
+    const mobList = document.getElementById(`list-${id}-mob`);
+    if (mobList) {
+      const parentList = mobList.closest('.island-list');
+      if (parentList) toggleIslandInList(parentList, id, '-mob');
     }
   }
 
@@ -1940,25 +1922,31 @@
   }
 
   function clearSidebarSearch() {
-    if (!areaSearchEl) return;
-    areaSearchEl.value = '';
+    const searchEl = getAreaSearchEl();
+    if (!searchEl) return;
+    searchEl.value = '';
     syncSearchClearVisibility();
     filterSidebar();
-    areaSearchEl.focus();
+    searchEl.focus();
   }
 
   // Show the clear (✕) button only when there's text to clear
   function syncSearchClearVisibility() {
-    const wrap = areaSearchEl?.closest('.search-input-wrapper');
+    const searchEl = getAreaSearchEl();
+    const wrap = searchEl?.closest('.search-input-wrapper');
     if (!wrap) return;
-    wrap.classList.toggle('has-value', Boolean(areaSearchEl.value));
+    wrap.classList.toggle('has-value', Boolean(searchEl.value));
   }
 
   function filterSidebar() {
-    const term = normalizeHawaiianText(areaSearchEl?.value || '');
+    const searchEl = getAreaSearchEl();
+    const term = normalizeHawaiianText(searchEl?.value || '');
+    // Filter whichever island list is active
+    const targetListEl = isMobileView() ? islandListMobEl : islandListEl;
+    if (!targetListEl) return;
     let totalMatches = 0;
 
-    document.querySelectorAll('.island-group').forEach((group) => {
+    targetListEl.querySelectorAll('.island-group').forEach((group) => {
       const islandLabel = group.querySelector('.header-left span')?.textContent || '';
       const islandMatch = term !== '' && normalizeHawaiianText(islandLabel).includes(term);
       let hasMatch      = false;
@@ -1990,14 +1978,14 @@
       }
     });
 
-    let notice = document.getElementById('search-no-results');
+    let notice = targetListEl.querySelector('#search-no-results');
     if (!notice) {
       notice = document.createElement('div');
       notice.id = 'search-no-results';
       notice.className = 'loading-notice';
       notice.textContent = 'No matching areas found';
       notice.hidden = true;
-      islandListEl?.appendChild(notice);
+      targetListEl.appendChild(notice);
     }
     notice.hidden = !(term !== '' && totalMatches === 0);
   }
@@ -2165,138 +2153,148 @@
 
       // Signal to screen readers that the list is ready
       islandListEl?.removeAttribute('aria-busy');
+      islandListMobEl?.removeAttribute('aria-busy');
 
-      // Append "About this map" button at the bottom of the island list
-      if (islandListEl) {
+      // Append "About this map" button at the bottom of both island lists
+      [islandListEl, islandListMobEl].forEach((listEl) => {
+        if (!listEl) return;
         const aboutBtn = document.createElement('button');
         aboutBtn.type = 'button';
         aboutBtn.className = 'about-map-btn';
         aboutBtn.innerHTML = '<span class="about-map-btn__icon">ℹ</span><span class="about-map-btn__label">About this map</span>';
         aboutBtn.addEventListener('click', openAboutPane);
-        islandListEl.appendChild(aboutBtn);
-      }
+        listEl.appendChild(aboutBtn);
+      });
 
     } catch (err) {
       console.error('[haMMA] Failed to load service data:', err);
       islandListEl?.removeAttribute('aria-busy');
+      islandListMobEl?.removeAttribute('aria-busy');
 
-      if (islandListEl) {
-        islandListEl.innerHTML = `
-          <div class="error-notice">
-            <p>Unable to load marine areas. Please check your connection.</p>
-            <button class="retry-btn" type="button" id="retry-load-btn">Try again</button>
-          </div>`;
-        document.getElementById('retry-load-btn')?.addEventListener('click', () => {
-          islandListEl.innerHTML =
-            '<div class="loading-notice" role="status">Loading marine areas…</div>';
-          islandListEl.setAttribute('aria-busy', 'true');
+      const errorHtml = `
+        <div class="error-notice">
+          <p>Unable to load marine areas. Please check your connection.</p>
+          <button class="retry-btn retry-load-btn" type="button">Try again</button>
+        </div>`;
+
+      if (islandListEl) islandListEl.innerHTML = errorHtml;
+      if (islandListMobEl) islandListMobEl.innerHTML = errorHtml;
+
+      document.querySelectorAll('.retry-load-btn')?.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const loadingHtml = '<div class="loading-notice" role="status">Loading marine areas…</div>';
+          if (islandListEl)    { islandListEl.innerHTML = loadingHtml;    islandListEl.setAttribute('aria-busy', 'true'); }
+          if (islandListMobEl) { islandListMobEl.innerHTML = loadingHtml; islandListMobEl.setAttribute('aria-busy', 'true'); }
           loadAllFromSingleService();
         });
-      }
+      });
     }
   }
 
 
   // ── 19. EVENT WIRING ─────────────────────────────────────────
 
-  // Search
+  // Desktop search
   areaSearchEl?.addEventListener('input',  () => { syncSearchClearVisibility(); filterSidebar(); });
   searchClearEl?.addEventListener('click', clearSidebarSearch);
 
-  // Mobile banner buttons
-  document.getElementById('info-back-btn')?.addEventListener('click', () => {
-    // Slide back to list at the same height the info panel was at
+  // Mobile search
+  areaSearchMobEl?.addEventListener('input',  () => { syncSearchClearVisibility(); filterSidebar(); });
+  searchClearMobEl?.addEventListener('click', clearSidebarSearch);
+
+  // Mobile back button
+  document.getElementById('sheet-back-btn')?.addEventListener('click', () => {
     applyMobileState(infoToListState(mobileState));
   });
 
-  // Wire drag zones to the state machine.
-  // List side: the brand panel itself is the drag surface.
-  // Info side: the info-mobile-header contains the drag zone.
-  // Wire both the full banner and protruding tab as drag touch targets.
-  wireSheetBannerDrag('brand-panel', 'list');
-  wireSheetBannerDrag('list-drag-zone', 'list');
-  wireSheetBannerDrag('info-banner', 'info');
-  wireSheetBannerDrag('info-drag-zone', 'info', { enableRestoreTap: true });
+  // Mobile drag — single drag target: the drag tab
+  document.getElementById('sheet-drag-tab')?.addEventListener(
+    'touchstart', onSheetDragStart, { passive: true }
+  );
+  // Also allow dragging from the banner area (not over buttons)
+  document.getElementById('sheet-list-banner')?.addEventListener(
+    'touchstart', onSheetDragStart, { passive: true }
+  );
+  document.getElementById('sheet-info-banner')?.addEventListener(
+    'touchstart', onSheetDragStart, { passive: true }
+  );
 
-  // Info panel — single delegated listener for all dynamic content:
-  // tab buttons, summary accordion toggle, and image carousel
-  infoContentEl?.addEventListener('click', (e) => {
-    // Tab switching
-    const tabBtn = e.target.closest('[data-tab-target]');
-    if (tabBtn) {
-      showTab(tabBtn, tabBtn.dataset.tabTarget);
-      return;
-    }
-
-    // Summary accordion
-    // Source legend pill → flash polygon (no map movement)
-    const flashPill = e.target.closest('[data-flash-area]');
-    if (flashPill) {
-      flashFeatureByName(flashPill.dataset.flashArea);
-      return;
-    }
-
-    // Overlap notice dismiss button
-    const dismissBtn = e.target.closest('.overlap-notice__dismiss');
-    if (dismissBtn) {
-      dismissBtn.closest('.overlap-notice')?.remove();
-      return;
-    }
-
-    const accordionToggle = e.target.closest('[data-action="toggle-summary"]');
-    if (accordionToggle) {
-      toggleSummaryAccordion(accordionToggle);
-      return;
-    }
-
-    // Image carousel nav buttons (prev or next)
-    const navBtn = e.target.closest('.mmcard__image-nav');
-    if (navBtn) {
-      const wrap = navBtn.closest('.mmcard__image-wrap');
-      const img  = wrap?.querySelector('.mmcard__image');
-      if (!wrap || !img) return;
-
-      const images = (navBtn.dataset.images || '')
-        .split('|')
-        .filter(Boolean)
-        .map((encoded) => {
-          try { return JSON.parse(decodeURIComponent(encoded)); }
-          catch (_err) { return null; }
-        })
-        .filter((img) => img?.url);
-      if (images.length < 2) return;
-
-      const direction = Number(navBtn.dataset.direction || 1);
-      const cur  = Number(wrap.dataset.carouselIndex || 0);
-      const next = (cur + direction + images.length) % images.length;
-      wrap.dataset.carouselIndex = String(next);
-      img.src = images[next].url;
-      img.alt = images[next].alt || 'Area image';
-      wrap.classList.remove('is-image-failed');
-      const fallback = wrap.querySelector('.mmcard__image-fallback');
-      if (fallback) fallback.hidden = true;
-
-      // Sync dot indicators
-      wrap.querySelectorAll('.mmcard__image-dot').forEach((dot, i) => {
-        dot.classList.toggle('is-active', i === next);
-      });
+  // Tap drag tab when hidden → restore
+  document.getElementById('sheet-drag-tab')?.addEventListener('click', () => {
+    if (mobileState === 'hidden') {
+      const view = sheetEl?.dataset.view || 'list';
+      applyMobileState(view === 'info' ? 'info-half' : 'list-open');
     }
   });
 
-  infoContentEl?.addEventListener('error', (e) => {
-    const imageEl = e.target.closest('.mmcard__image');
-    if (!imageEl) return;
-    const wrap = imageEl.closest('.mmcard__image-wrap');
-    if (!wrap) return;
-    imageEl.style.display = 'none';
-    wrap.classList.add('is-image-failed');
-    const fallback = wrap.querySelector('.mmcard__image-fallback');
-    if (fallback) fallback.hidden = false;
-  }, true);
+  // Info panel — single delegated listener for all dynamic content
+  // Covers BOTH desktop and mobile info content elements
+  function wireInfoContent(el) {
+    if (!el) return;
+    el.addEventListener('click', (e) => {
+      const tabBtn = e.target.closest('[data-tab-target]');
+      if (tabBtn) { showTab(tabBtn, tabBtn.dataset.tabTarget); return; }
+
+      const flashPill = e.target.closest('[data-flash-area]');
+      if (flashPill) { flashFeatureByName(flashPill.dataset.flashArea); return; }
+
+      const dismissBtn = e.target.closest('.overlap-notice__dismiss');
+      if (dismissBtn) { dismissBtn.closest('.overlap-notice')?.remove(); return; }
+
+      const accordionToggle = e.target.closest('[data-action="toggle-summary"]');
+      if (accordionToggle) { toggleSummaryAccordion(accordionToggle); return; }
+
+      const navBtn = e.target.closest('.mmcard__image-nav');
+      if (navBtn) {
+        const wrap = navBtn.closest('.mmcard__image-wrap');
+        const img  = wrap?.querySelector('.mmcard__image');
+        if (!wrap || !img) return;
+
+        const images = (navBtn.dataset.images || '')
+          .split('|')
+          .filter(Boolean)
+          .map((encoded) => {
+            try { return JSON.parse(decodeURIComponent(encoded)); }
+            catch (_err) { return null; }
+          })
+          .filter((img) => img?.url);
+        if (images.length < 2) return;
+
+        const direction = Number(navBtn.dataset.direction || 1);
+        const cur  = Number(wrap.dataset.carouselIndex || 0);
+        const next = (cur + direction + images.length) % images.length;
+        wrap.dataset.carouselIndex = String(next);
+        img.src = images[next].url;
+        img.alt = images[next].alt || 'Area image';
+        wrap.classList.remove('is-image-failed');
+        const fallback = wrap.querySelector('.mmcard__image-fallback');
+        if (fallback) fallback.hidden = true;
+
+        wrap.querySelectorAll('.mmcard__image-dot').forEach((dot, i) => {
+          dot.classList.toggle('is-active', i === next);
+        });
+      }
+    });
+
+    el.addEventListener('error', (e) => {
+      const imageEl = e.target.closest('.mmcard__image');
+      if (!imageEl) return;
+      const wrap = imageEl.closest('.mmcard__image-wrap');
+      if (!wrap) return;
+      imageEl.style.display = 'none';
+      wrap.classList.add('is-image-failed');
+      const fallback = wrap.querySelector('.mmcard__image-fallback');
+      if (fallback) fallback.hidden = false;
+    }, true);
+  }
+
+  wireInfoContent(infoContentEl);
+  wireInfoContent(infoContentMobEl);
 
   // Map events
-  map.on('click',     () => { if (!isMobileView()) clearMapSelection({ fromClick: true }); });
-  // Resize — debounced so syncResponsiveSidebarState isn't called on every pixel
+  map.on('click', () => { if (!isMobileView()) clearMapSelection({ fromClick: true }); });
+
+  // Resize — debounced
   let resizeTimer;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
