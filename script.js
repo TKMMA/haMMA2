@@ -903,8 +903,8 @@
   // ── Info pane HTML ────────────────────────────────────────────
   function renderSingleAreaInfoPane(feature, overlapCount) {
     const notice = overlapCount > 0 ? `
-      <div class="info-banner info-banner--notice" role="status">
-        <span class="info-banner__icon" aria-hidden="true">ⓘ</span>
+      <div class="info-banner" role="status">
+        <svg class="info-banner__icon" viewBox="0 0 256 256" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M224,128a96,96,0,1,1-96-96A96,96,0,0,1,224,128Z" opacity="0.2"></path><path d="M144,176a8,8,0,0,1-8,8,16,16,0,0,1-16-16V128a8,8,0,0,1,0-16,16,16,0,0,1,16,16v40A8,8,0,0,1,144,176Zm88-48A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128ZM124,96a12,12,0,1,0-12-12A12,12,0,0,0,124,96Z"></path></svg>
         <span class="info-banner__text">
           <strong>${overlapCount} other managed area${overlapCount===1?'':'s'} overlap${overlapCount===1?'s':''} with this zone.</strong>
           Tap the map to see combined rules at a specific spot.
@@ -939,39 +939,6 @@
 
 
   // ── 12. INFO PANEL OPEN / CLOSE ──────────────────────────────
-  const README_HTML = `
-    <div class="about-pane">
-      <div class="about-pane__hero">
-        <h2 class="about-pane__title">haMMA — Hawaiʿi Managed Marine &amp; Freshwater Areas</h2>
-        <p class="about-pane__tagline">A public map for fishers, divers, and ocean users in Hawaiʿi.</p>
-      </div>
-      <section class="about-pane__section">
-        <p><em>All statewide fishing regulations still apply on top of each area's specific rules.</em></p>
-      </section>
-      <section class="about-pane__section">
-        <h3>Why this exists</h3>
-        <p>Since the 1960s, the Hawaiʿi Division of Aquatic Resources (DAR) has established place-specific regulations for 90 different marine and freshwater areas across the state. These areas frequently overlap, and their rules are scattered across dense legal documents that are hard to find and harder to read.</p>
-        <p>Someone on a boat near Miloliʻi might be inside the West Hawaiʿi RFMA, the Miloliʻi CBSFA, the Miloliʻi FRA, and sub-zones — each with different rules. haMMA makes that clear at a glance.</p>
-      </section>
-      <section class="about-pane__section">
-        <h3>How to use it</h3>
-        <p><strong>Tap or click the map</strong> to see every managed area at that spot and the applicable rules.</p>
-        <p><strong>Browse the list</strong> to find a specific area by island and name.</p>
-      </section>
-      <section class="about-pane__section">
-        <h3>Data &amp; accuracy</h3>
-        <p>Rules are sourced from official HAR and HRS documents. This tool is informational only — always verify rules with DAR before entering a managed area.</p>
-      </section>
-      <section class="about-pane__section">
-        <h3>Contact</h3>
-        <p>Built by Tyler Kueffner for DAR and for Hawaiʿi's fishers.</p>
-        <p><a href="mailto:tk85@hawaii.edu" class="about-pane__link">tk85@hawaii.edu</a></p>
-      </section>
-      <section class="about-pane__section about-pane__section--links">
-        <a href="https://dlnr.hawaii.gov/dar/" target="_blank" rel="noopener" class="about-pane__link">Division of Aquatic Resources ↗</a>
-      </section>
-    </div>`;
-
   function setPanelTitle(title) {
     const el = document.getElementById('panel-info-title');
     if (el) el.textContent = title;
