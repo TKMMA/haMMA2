@@ -38,7 +38,7 @@
   const INITIAL_CHAIN_BOUNDS = L.latLngBounds([[18.9, -160.0], [22.35, -154.2]]);
   const PANEL_WIDTH          = 380;   // must match --panel-width in CSS
   const PANEL_MARGIN         = 12;    // must match --panel-margin in CSS
-  const TRANSITION_MS        = 400;   // must match --dur-slow in CSS
+  const TRANSITION_MS        = 360;   // must match --dur-slow in CSS (0.36s)
   const MOBILE_MQ            = window.matchMedia('(max-width: 768px)');
 
   const RULES_CATEGORIES = [
