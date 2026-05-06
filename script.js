@@ -248,6 +248,13 @@
     document.getElementById('panel-info-title');  // no-op — just ensure ref
   }
 
+  function resetInfoScrollPosition() {
+    if (!infoContentEl) return;
+    infoContentEl.scrollTop = 0;
+    const innerScroll = infoContentEl.querySelector('.mmpopup__scroll');
+    if (innerScroll) innerScroll.scrollTop = 0;
+  }
+
   function setSnap(snap) {
     if (!isMobile()) return;
     panelEl.dataset.snap = snap;
@@ -941,6 +948,7 @@
     clearMapSelection();
     setPanelTitle('About');
     infoContentEl.innerHTML = `<div class="mmpopup"><div class="mmpopup__scroll">${README_HTML}</div></div>`;
+    resetInfoScrollPosition();
     openInfoView();
     clearAccordionSelectionHighlight();
     sharePayload = null;
@@ -973,8 +981,7 @@
       : renderSingleAreaInfoPane(features[0], overlapCount);
 
     // Scroll to top
-    const scroll = infoContentEl.querySelector('.mmpopup__scroll');
-    if (scroll) scroll.scrollTop = 0;
+    resetInfoScrollPosition();
 
     // Set header title
     const title = isMulti ? `${count} Area${count===1?'':'s'} Selected` : areaName;
