@@ -784,16 +784,13 @@
         ? multi.map((s) => renderSourceChip(s)).join('')
         : renderSourceChip(source);
 
-      const lines = text.split('\n').filter(Boolean);
-      const itemsHtml = lines.map((line, idx) => {
-        const clean = line.replace(/^[-•]\s*/,'').trim();
-        if (!clean) return '';
-        const chips = idx === lines.length - 1
-          ? `<span class="rule-item__chips">${chipHtml}</span>` : '';
-        return `<li class="rule-item">${escapeHtml(clean)}${chips}</li>`;
-      }).join('');
+      const items = text.split('\n').filter(Boolean)
+        .map((line) => {
+          const clean = line.replace(/^[-•]\s*/,'').trim();
+          return clean ? `<li class="rule-item">${escapeHtml(clean)}</li>` : '';
+        }).join('');
 
-      return `<div class="summary-field-entry"><ul class="rule-item-list rule-item-list--chipped">${itemsHtml}</ul></div>`;
+      return `<div class="summary-field-entry"><div class="summary-entry-chips">${chipHtml}</div><ul class="rule-item-list">${items}</ul></div>`;
     }).join('');
 
     return `<div class="summary-status-group">
