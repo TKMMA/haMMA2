@@ -666,6 +666,7 @@ a { color: inherit; }
 
 /* ── 13. SUMMARY CARD LAYOUT ────────────────────────────────── */
 /* Visual styling handled by .mmcard--summary above. Layout only. */
+/* Contract selectors used by JS: [data-summary-card], [data-summary-body], [data-action="toggle-summary"] */
 .summary-card-toggle {
   width: 100%;
   display: flex; align-items: center; gap: 8px;
