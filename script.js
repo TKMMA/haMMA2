@@ -1276,7 +1276,19 @@
         fetch(`${SERVICE_LAYER_URL}?f=json`),
         fetch(`${SERVICE_LAYER_URL}/query?where=1=1&outFields=*&f=geojson&returnGeometry=true`),
       ]);
+
+      if (!metaResp.ok || !dataResp.ok) {
+        throw new Error(`Service responded with HTTP ${!metaResp.ok ? metaResp.status : dataResp.status}`);
+      }
+
       const [metadata, geojson] = await Promise.all([metaResp.json(), dataResp.json()]);
+
+      if (metadata.error) {
+        throw new Error(`ArcGIS error ${metadata.error.code}: ${metadata.error.message}`);
+      }
+      if (!geojson.features) {
+        throw new Error('ArcGIS returned no features array — service may be unavailable or schema changed');
+      }
 
       const renderer      = metadata?.drawingInfo?.renderer;
       const globalOpacity = (100 - (metadata?.drawingInfo?.transparency || 0)) / 100;
