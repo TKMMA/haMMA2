@@ -973,6 +973,7 @@
       : renderSingleAreaInfoPane(features[0], overlapCount);
 
     // Scroll to top
+    infoContentEl.scrollTop = 0;
     const scroll = infoContentEl.querySelector('.mmpopup__scroll');
     if (scroll) scroll.scrollTop = 0;
 
