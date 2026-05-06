@@ -323,7 +323,7 @@
       return;
     }
     map.fitBounds(INITIAL_CHAIN_BOUNDS, {
-      paddingTopLeft:     [PANEL_WIDTH + PANEL_MARGIN * 2 + 24, 30],
+      paddingTopLeft:     [getPanelWidth() + PANEL_MARGIN + 24, 30],
       paddingBottomRight: [24, 30],
       maxZoom: 8.5,
     });
@@ -1003,6 +1003,7 @@
     if (options.source === 'menu' && activeLastBounds) {
       fitInView(activeLastBounds, { delay: TRANSITION_MS });
     }
+  }
 
 
   // ── 13. SHARE ────────────────────────────────────────────────
