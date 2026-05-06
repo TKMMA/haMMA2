@@ -918,41 +918,7 @@ a { color: inherit; }
 .tab-pane { font-size: 13px; line-height: 1.6; color: var(--text-primary); }
 
 
-/* ── UNIFIED STATUS PILLS (area cards + summary) ────────────── */
-/* Replaces the old rule-status-block left-border pattern on cards */
-/* Both contexts now use the same pill shape */
-.rule-status-block {
-  margin-bottom: 5px; border-radius: var(--r-sm); overflow: hidden;
-}
-.rule-status-block:last-child { margin-bottom: 0; }
-
-.rule-status-block__header {
-  display: inline-flex; align-items: center;
-  font-size: 10px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.06em;
-  padding: 3px 10px;
-  border-radius: var(--r-pill);
-  margin-bottom: 4px;
-}
-
-/* Light context pills */
-.rule-status--prohibited .rule-status-block__header {
-  background: var(--status-prohibited-bg);
-  color: var(--status-prohibited);
-}
-.rule-status--allowed .rule-status-block__header {
-  background: var(--status-allowed-bg);
-  color: var(--status-allowed);
-}
-.rule-status--limited .rule-status-block__header {
-  background: var(--status-limited-bg);
-  color: var(--status-limited);
-}
-.rule-status--notes .rule-status-block__header {
-  background: var(--status-notes-bg);
-  color: var(--text-secondary);
-}
-
+/* Status pill styles are defined above in section 12 and shared by cards + summary. */
 
 /* ── 17. SHARE TOAST ────────────────────────────────────────── */
 .share-toast {
