@@ -86,10 +86,10 @@
   ];
 
   const RULE_STATUS = {
-    prohibited: { label: 'Prohibited',         cls: 'rule-status--prohibited' },
-    allowed:    { label: 'Allowed',             cls: 'rule-status--allowed'    },
-    limited:    { label: 'Allowed with limits', cls: 'rule-status--limited'    },
-    notes:      { label: 'Notes',               cls: 'rule-status--notes'      },
+    prohibited: { label: 'Prohibited:',         cls: 'rule-status--prohibited' },
+    allowed:    { label: 'Allowed:',             cls: 'rule-status--allowed'    },
+    limited:    { label: 'Allowed with limits:', cls: 'rule-status--limited'    },
+    notes:      { label: 'Notes:',               cls: 'rule-status--notes'      },
   };
 
   const FIELD_SCHEMA = {
@@ -854,14 +854,12 @@
   // ── Info pane HTML ────────────────────────────────────────────
   function renderSingleAreaInfoPane(feature, overlapCount) {
     const notice = overlapCount > 0 ? `
-      <div class="overlap-notice" role="status">
-        <span class="overlap-notice__text">
+      <div class="info-banner info-banner--notice" role="status">
+        <span class="info-banner__icon" aria-hidden="true">ⓘ</span>
+        <span class="info-banner__text">
           <strong>${overlapCount} other managed area${overlapCount===1?'':'s'} overlap${overlapCount===1?'s':''} with this zone.</strong>
           Tap the map to see combined rules at a specific spot.
         </span>
-        <button class="overlap-notice__dismiss" type="button" aria-label="Dismiss">
-          <svg viewBox="0 0 256 256" style="width:12px;height:12px;fill:currentColor" aria-hidden="true"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg>
-        </button>
       </div>` : '';
     return `<div class="mmpopup">${notice}
       <div class="mmpopup__scroll">${buildAreaCard(feature,'area-0')}</div>
@@ -870,24 +868,19 @@
 
   function renderOverlapInfoPane(features) {
     const count = features.length;
-    // Summary starts collapsed — user taps to expand
     return `<div class="mmpopup">
-      <button class="summary-toggle-btn" type="button"
-              aria-expanded="false" data-action="toggle-summary">
-        <span class="summary-toggle-pill">
-          Combined rules for ${count} areas
-          <svg class="summary-toggle-chevron" viewBox="0 0 256 256" aria-hidden="true">
-            <path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/>
-          </svg>
-        </span>
+      <button class="info-banner info-banner--toggle" type="button"
+              aria-expanded="true" data-action="toggle-summary">
+        <span class="info-banner__label">Combined rules for ${count} area${count===1?'':'s'}</span>
+        <svg class="info-banner__chevron" viewBox="0 0 256 256" aria-hidden="true">
+          <path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/>
+        </svg>
       </button>
-      <div class="summary-body" id="summary-body-${Date.now()}">
+      <div class="summary-body">
         ${buildSummaryPanel(features)}
       </div>
       <div class="mmpopup__scroll">
-        <section class="overlap-areas area-specific-section" aria-label="Area-specific rules">
-          <h4 class="overlap-areas__title">Area-specific rules</h4>
-          <p class="overlap-areas__copy">These cards preserve the original rules for each selected area.</p>
+        <section class="area-specific-section" aria-label="Area-specific rules">
           ${features.map((f,i) => buildAreaCard(f,`area-${i}`)).join('')}
         </section>
       </div>
@@ -1450,13 +1443,10 @@
       toggleBtn.setAttribute('aria-expanded', String(!isExpanded));
       const body = toggleBtn.nextElementSibling;
       if (body?.classList.contains('summary-body')) {
-        body.classList.toggle('is-open', !isExpanded);
+        body.classList.toggle('is-closed', isExpanded);
       }
       return;
     }
-
-    const dismiss = e.target.closest('.overlap-notice__dismiss');
-    if (dismiss) { dismiss.closest('.overlap-notice')?.remove(); return; }
 
     const navBtn = e.target.closest('.mmcard__image-nav');
     if (navBtn) {
