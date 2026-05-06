@@ -119,7 +119,92 @@
     <div id="map" role="application"
          aria-label="Interactive map of Hawaii managed areas"></div>
   </div>
+  <!-- About pane content — edit this to update the About page.
+     JS reads this template and injects it into the panel.
+     data-app-updated and data-data-updated are filled in automatically at runtime. -->
+<template id="about-content">
+  <div class="about-pane">
 
+    <div class="about-pane__hero">
+      <h2 class="about-pane__title">haMMA — Hawaiʻi Managed Marine &amp; Freshwater Areas</h2>
+      <p class="about-pane__tagline">A public map for fishers, divers, and ocean users in Hawaiʻi.</p>
+    </div>
+
+    <section class="about-pane__section">
+      <p class="about-pane__disclaimer">
+        <em>All statewide fishing regulations still apply on top of each area's specific rules.
+        haMMA is informational only — always verify rules with DAR before entering a managed area.</em>
+      </p>
+    </section>
+
+    <section class="about-pane__section">
+      <h3>Why this exists</h3>
+      <p>Since the 1960s, the Hawaiʻi Division of Aquatic Resources (DAR) has established
+      place-specific regulations for 90+ marine and freshwater areas across the state —
+      Marine Life Conservation Districts, Fish Replenishment Areas, Community-Based
+      Subsistence Fishing Areas, Public Fishing Areas, and more.</p>
+      <p>These areas frequently overlap, and their rules are scattered across dense legal
+      documents that are hard to find and harder to read. Someone anchored near Miloliʻi
+      might be inside the West Hawaiʻi RFMA, the Miloliʻi CBSFA, the Miloliʻi FRA, and
+      one or more sub-zones simultaneously — each with different rules for gear, species,
+      seasons, and activities.</p>
+      <p>haMMA makes that clear at a glance, on a phone, in the field.</p>
+    </section>
+
+    <section class="about-pane__section">
+      <h3>How to use it</h3>
+      <p><strong>Tap the map</strong> to see every managed area at that exact spot and the
+      rules that apply there — including combined rules when multiple areas overlap.</p>
+      <p><strong>Browse the list</strong> to find a specific area by island and name, then
+      tap it to fly to it on the map and open its rules card.</p>
+    </section>
+
+    <section class="about-pane__section">
+      <h3>The data</h3>
+      <p>Rules are sourced from official Hawaii Administrative Rules (HAR) and Hawaii
+      Revised Statutes (HRS) documents. A custom pipeline reads each source PDF directly
+      from government servers and organizes the rule text into a structured GIS layer —
+      a hosted ArcGIS Online feature service maintained by the project team. Rule text
+      is written in plain English, and Hawaiian species names use correct diacritical
+      markings (ʻokina and kahakō) even when the source documents do not.</p>
+      <p>When in doubt, always verify rules directly with DAR or the official legal documents
+      linked in the Laws tab of each area card.</p>
+    </section>
+
+    <section class="about-pane__section">
+      <h3>Built by</h3>
+      <p>Tyler Kueffner, for DAR and for Hawaiʻi's fishers and ocean users. The app is
+      written from scratch — no framework, just vanilla JavaScript, CSS, and
+      <a href="https://leafletjs.com" target="_blank" rel="noopener" class="about-pane__link">Leaflet.js</a>
+      for the map.</p>
+      <p>Questions, data corrections, or bug reports:
+      <a href="mailto:tk85@hawaii.edu" class="about-pane__link">tk85@hawaii.edu</a></p>
+    </section>
+
+    <section class="about-pane__section about-pane__section--versions">
+      <h3>Version info</h3>
+      <div class="about-pane__versions">
+        <div class="about-pane__version-row">
+          <span class="about-pane__version-label">Map &amp; app last updated</span>
+          <span class="about-pane__version-value" data-app-updated>—</span>
+        </div>
+        <div class="about-pane__version-row">
+          <span class="about-pane__version-label">Rules data last updated</span>
+          <span class="about-pane__version-value" data-data-updated>—</span>
+        </div>
+      </div>
+      <p class="about-pane__version-note">Data is maintained in a live GIS layer and updated
+      independently of the app code.</p>
+    </section>
+
+    <section class="about-pane__section about-pane__section--links">
+      <a href="https://dlnr.hawaii.gov/dar/" target="_blank" rel="noopener" class="about-pane__link">
+        Division of Aquatic Resources ↗
+      </a>
+    </section>
+
+  </div>
+</template>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="script.js"></script>
 </body>
