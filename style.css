@@ -169,20 +169,60 @@ a { color: inherit; }
 .panel[data-view="list"] .panel-header__list { display: flex; flex-direction: column; }
 .panel[data-view="info"] .panel-header__info  { display: flex; flex-direction: column; }
 
-/* ── List header brand row ───────────────────────────────────── */
+/* ── List header brand row — true three-column layout ───────── */
 .panel-header__brand {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px 12px;
+  padding: 0 12px;
   min-height: var(--panel-header-h);
+  gap: 8px;
+  position: relative;
 }
 
+/* Left slot: collapse button (desktop) or DAR logo (mobile) */
+.panel-header__brand-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Center slot: title block */
+.brand-title-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  min-width: 0;
+}
+
+/* Right slot: state seal */
+.panel-header__brand-right {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.brand-logo {
+  width: 30px; height: 30px;
+  object-fit: contain; flex-shrink: 0;
+}
+
+.brand-title-main {
+  margin: 0;
+  color: rgba(255,255,255,0.95);
+  font-size: 14px; font-weight: 700;
+  letter-spacing: -0.01em; line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* Collapse button — matches share/close button style exactly */
 .panel-collapse-btn {
   display: none; /* desktop only */
+  width: 34px; height: 34px;
   flex-shrink: 0;
-  width: 32px; height: 32px;
-  background: rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.08);
   border: 1px solid rgba(255,255,255,0.18);
   border-radius: 8px;
   color: rgba(255,255,255,0.75);
@@ -191,38 +231,10 @@ a { color: inherit; }
   padding: 0;
 }
 .panel-collapse-btn:hover {
-  background: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.18);
   color: #fff;
 }
 .panel-collapse-btn .btn-icon { width: 16px; height: 16px; }
-
-.brand-logos {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-.brand-logo {
-  width: 30px; height: 30px;
-  object-fit: contain;
-  flex-shrink: 0;
-}
-
-.brand-title-block {
-  flex: 1;
-  min-width: 0;
-}
-.brand-title-main {
-  margin: 0;
-  color: rgba(255,255,255,0.95);
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
 /* ── Info header ─────────────────────────────────────────────── */
 .panel-header__info-row {
@@ -442,15 +454,16 @@ a { color: inherit; }
 
 .area-item {
   display: flex; align-items: center;
-  padding: 0 14px 0 24px;
-  height: 36px;
+  padding: 8px 14px 8px 24px;
+  min-height: 36px;
   font-size: 13px;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-light);
   border-left: 2px solid transparent;
   cursor: pointer;
+  line-height: 1.35;
   transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  /* Allow wrap — no truncation */
 }
 .area-item:hover {
   background: var(--brand-50);
@@ -994,6 +1007,43 @@ a { color: inherit; }
 .share-toast.is-visible { opacity: 1; }
 
 
+/* ── Dark panel — applied globally (desktop + mobile) ──────── */
+/* This replaces the mobile-only override. Both platforms use dark. */
+#panel {
+  --surface:          #0D1B2A;
+  --surface-tint:     #152536;
+  --surface-raised:   #192D40;
+  --surface-search:   #152536;
+
+  --text-primary:     #E0EEF5;
+  --text-secondary:   #8BAFC4;
+  --text-muted:       #4A7A96;
+  --text-hint:        #345E78;
+
+  --border-light:     rgba(255,255,255,0.07);
+  --border-mid:       rgba(255,255,255,0.12);
+  --border-brand:     rgba(255,255,255,0.08);
+
+  --selected-bg:      #1A3A5C;
+  --selected-text:    #A8D4EE;
+
+  /* Status colors — readable on dark */
+  --status-prohibited:      #FCA5A5;
+  --status-prohibited-bg:   rgba(239,68,68,0.15);
+  --status-prohibited-bar:  #EF4444;
+  --status-allowed:         #86EFAC;
+  --status-allowed-bg:      rgba(34,197,94,0.12);
+  --status-allowed-bar:     #22C55E;
+  --status-limited:         #FCD34D;
+  --status-limited-bg:      rgba(245,158,11,0.14);
+  --status-limited-bar:     #F59E0B;
+  --status-notes-bg:        rgba(255,255,255,0.05);
+  --status-notes-bar:       rgba(255,255,255,0.15);
+
+  background: var(--surface);
+}
+
+
 /* ── 18. DESKTOP LAYOUT ─────────────────────────────────────── */
 @media (min-width: 769px) {
 
@@ -1034,23 +1084,29 @@ a { color: inherit; }
   .brand-logo { width: 34px; height: 34px; }
   .brand-title-main { font-size: 15px; }
 
-  /* Reveal tab */
+  /* Reveal tab — flush to left edge of window, larger than before */
   .panel-reveal-btn {
-    position: fixed; top: 50%; left: var(--panel-margin);
-    transform: translateY(-50%);
-    width: 36px; height: 60px;
+    position: fixed;
+    top: var(--panel-margin);  /* same vertical position as panel top */
+    left: 0;                   /* flush to window edge — no gap */
+    width: 44px;
+    height: var(--panel-header-h);
     background: linear-gradient(160deg, var(--brand-900), var(--brand-600));
     color: rgba(255,255,255,0.85);
     border: none;
+    border-right: 1px solid rgba(255,255,255,0.12);
     border-radius: 0 var(--r-md) var(--r-md) 0;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 3px 0 16px rgba(0,0,0,0.2);
+    box-shadow: 3px 0 16px rgba(0,0,0,0.25);
     z-index: 1004; padding: 0;
     opacity: 0; pointer-events: none;
-    transition: opacity var(--dur-mid), color var(--dur-fast);
+    transition: opacity var(--dur-mid), color var(--dur-fast), background var(--dur-fast);
   }
-  .panel-reveal-btn .btn-icon { width: 18px; height: 18px; }
-  .panel-reveal-btn:hover { color: #fff; }
+  .panel-reveal-btn .btn-icon { width: 20px; height: 20px; }
+  .panel-reveal-btn:hover {
+    color: #fff;
+    background: linear-gradient(160deg, var(--brand-800), var(--brand-500));
+  }
   .panel.is-collapsed ~ .panel-reveal-btn { opacity: 1; pointer-events: auto; }
 
   .share-toast { bottom: 24px; }
@@ -1060,39 +1116,6 @@ a { color: inherit; }
 
 /* ── 19. MOBILE LAYOUT — DARK PANEL ────────────────────────── */
 @media (max-width: 768px) {
-
-  /* ── Dark panel token overrides ────────────────────────────── */
-  #panel {
-    --surface:          #0D1B2A;
-    --surface-tint:     #152536;
-    --surface-raised:   #192D40;
-    --surface-search:   #152536;
-
-    --text-primary:     #E0EEF5;
-    --text-secondary:   #8BAFC4;
-    --text-muted:       #4A7A96;
-    --text-hint:        #345E78;
-
-    --border-light:     rgba(255,255,255,0.07);
-    --border-mid:       rgba(255,255,255,0.12);
-    --border-brand:     rgba(255,255,255,0.08);
-
-    --selected-bg:      #1A3A5C;
-    --selected-text:    #A8D4EE;
-
-    /* Status colors for dark context */
-    --status-prohibited:      #FCA5A5;
-    --status-prohibited-bg:   rgba(239,68,68,0.15);
-    --status-prohibited-bar:  #EF4444;
-    --status-allowed:         #86EFAC;
-    --status-allowed-bg:      rgba(34,197,94,0.12);
-    --status-allowed-bar:     #22C55E;
-    --status-limited:         #FCD34D;
-    --status-limited-bg:      rgba(245,158,11,0.14);
-    --status-limited-bar:     #F59E0B;
-    --status-notes-bg:        rgba(255,255,255,0.05);
-    --status-notes-bar:       rgba(255,255,255,0.15);
-  }
 
   :root { --panel-header-h: 52px; }
 
