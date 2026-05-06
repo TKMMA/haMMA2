@@ -348,10 +348,10 @@
 
   function snapYForState(snap, view) {
     const H  = window.innerHeight;
-    const bh = 60;  // panel-header-h + accent border — approx
+    const bh = 72;  // --panel-header-h (52px) + --panel-grip-h (20px) on mobile
     if (snap === 'peek') return H - bh;
     if (snap === 'half') return H * 0.5;
-    if (snap === 'full') return view === 'info' ? H * 0.10 : H * 0.06;
+    if (snap === 'full') return view === 'info' ? H * 0.12 : H * 0.08;
     return H * 0.5;
   }
 
