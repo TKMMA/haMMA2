@@ -743,26 +743,10 @@ a { color: inherit; }
 .summary-status-group:last-child { margin-bottom: 0; }
 
 .summary-field-entry { padding: 2px 0; }
-.summary-field-entry__chips { display: none; }
-.summary-field-entry .rule-item-list--chipped {
-  padding: 4px 8px 4px 18px;
-}
-.rule-item-list--chipped .rule-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-}
-.rule-item-list--chipped .rule-item::before {
-  content: '•';
-  flex-shrink: 0;
-  color: var(--text-muted);
-  font-size: 10px;
-  margin-right: 2px;
-}
-.rule-item__chips {
-  display: inline-flex; gap: 3px; flex-shrink: 0;
-  align-items: center; position: relative; top: 1px;
-  margin-left: auto;
+.summary-entry-chips {
+  text-align: right;
+  margin-bottom: 3px;
+  line-height: 1;
 }
 .summary-empty { font-size: 12px; color: var(--text-muted); margin: 0; }
 
