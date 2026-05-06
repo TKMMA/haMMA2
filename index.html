@@ -10,83 +10,71 @@
   <meta property="og:type" content="website" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="map-interface">
 
-    <!--
-      Single panel, single DOM.
-      #panel holds both views; data-view="list"|"info" switches them.
-      CSS positions it as a left sidebar on desktop, bottom sheet on mobile.
-      All content — island list, info, search — lives here exactly once.
-    -->
     <aside id="panel" class="panel" data-view="list"
            role="complementary" aria-label="Areas and rules">
 
-      <!-- ── PANEL HEADER ──────────────────────────────────────
-           One header element. Content changes with data-view.
-           - List view: brand logos + title + desktop collapse btn
-           - Info view: back btn (prominent) + area title + share + close
-      ──────────────────────────────────────────────────────── -->
       <header class="panel-header" id="panel-header">
 
-        <!-- List header content -->
+        <!-- LIST HEADER -->
         <div class="panel-header__list">
-          <!-- Mobile grip handle -->
           <div class="panel-header__grip" id="panel-grip" aria-hidden="true">
             <span class="grip-bar"></span>
           </div>
           <div class="panel-header__brand">
-            <img class="brand-logo"
-                 src="https://devdar.rapidteksolutions.com/wp-content/themes/react-ts-theme/assets/img/logo-dar.png"
-                 alt="Division of Aquatic Resources logo" width="32" height="32" />
+            <!-- Desktop collapse — left side, double caret -->
+            <button class="panel-collapse-btn" id="panel-collapse-btn"
+                    type="button" aria-label="Collapse panel">
+              <svg viewBox="0 0 256 256" aria-hidden="true"><path d="M208.49,199.51a12,12,0,0,1-17,17l-80-80a12,12,0,0,1,0-17l80-80a12,12,0,0,1,17,17L137,128ZM57,128l71.52-71.51a12,12,0,0,0-17-17l-80,80a12,12,0,0,0,0,17l80,80a12,12,0,0,0,17-17Z"/></svg>
+            </button>
+            <div class="brand-logos">
+              <img class="brand-logo"
+                   src="https://devdar.rapidteksolutions.com/wp-content/themes/react-ts-theme/assets/img/logo-dar.png"
+                   alt="Division of Aquatic Resources" width="36" height="36" />
+              <img class="brand-logo"
+                   src="https://devdar.rapidteksolutions.com/wp-content/themes/react-ts-theme/assets/img/logo-state-of-hawai.png"
+                   alt="State of Hawaiʻi" width="36" height="36" />
+            </div>
             <div class="brand-title-block">
               <h1 class="brand-title-main">Managed Areas</h1>
             </div>
-            <img class="brand-logo"
-                 src="https://devdar.rapidteksolutions.com/wp-content/themes/react-ts-theme/assets/img/logo-state-of-hawai.png"
-                 alt="State of Hawaiʻi logo" width="32" height="32" />
           </div>
-          <!-- Desktop collapse button -->
-          <button class="panel-collapse-btn" id="panel-collapse-btn"
-                  type="button" aria-label="Collapse panel" title="Collapse panel">
-            <span class="panel-collapse-btn__icon">‹</span>
-          </button>
         </div>
 
-        <!-- Info header content -->
+        <!-- INFO HEADER -->
         <div class="panel-header__info">
-          <!-- Mobile grip handle -->
           <div class="panel-header__grip" aria-hidden="true">
             <span class="grip-bar"></span>
           </div>
           <div class="panel-header__info-row">
             <button class="panel-back-btn" id="panel-back-btn"
                     type="button" aria-label="Back to areas list">
-              <span class="panel-back-btn__arrow">←</span>
-              <span class="panel-back-btn__label">Areas List</span>
+              <svg class="btn-icon" viewBox="0 0 256 256" aria-hidden="true"><path d="M228,128a12,12,0,0,1-12,12H69l51.52,51.51a12,12,0,0,1-17,17l-72-72a12,12,0,0,1,0-17l72-72a12,12,0,0,1,17,17L69,116H216A12,12,0,0,1,228,128Z"/></svg>
+              <span>List</span>
             </button>
-            <span class="panel-info-title" id="panel-info-title"
-                  aria-live="polite">Area Info</span>
+            <span class="panel-info-title" id="panel-info-title" aria-live="polite">Area Info</span>
             <div class="panel-header__actions">
               <button class="panel-share-btn" id="panel-share-btn"
                       type="button" aria-label="Share this area" title="Share">
-                <span aria-hidden="true">⬆</span>
+                <svg class="btn-icon" viewBox="0 0 256 256" aria-hidden="true"><path d="M240.49,103.52l-80-80A12,12,0,0,0,140,32V68.74c-25.76,3.12-53.66,15.89-76.75,35.47-29.16,24.74-47.32,56.69-51.14,90A16,16,0,0,0,39.67,207h0c10.46-11.14,47-45.74,100.33-50.42V192a12,12,0,0,0,20.48,8.48l80-80A12,12,0,0,0,240.49,103.52ZM164,163V144a12,12,0,0,0-12-12c-49,0-86.57,21.56-109.79,40.11,7.13-18.16,19.63-35.22,36.57-49.59C101.3,103.41,128.67,92,152,92a12,12,0,0,0,12-12V61l51,51Z"/></svg>
               </button>
               <button class="panel-close-btn" id="panel-close-btn"
-                      type="button" aria-label="Close and return to list" title="Close">
-                <span aria-hidden="true">✕</span>
+                      type="button" aria-label="Close" title="Close">
+                <svg class="btn-icon" viewBox="0 0 256 256" aria-hidden="true"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg>
               </button>
             </div>
           </div>
         </div>
 
-      </header><!-- /.panel-header -->
+      </header>
 
-      <!-- ── LIST VIEW ──────────────────────────────────────── -->
+      <!-- LIST VIEW -->
       <div class="panel-view panel-view--list">
         <div class="panel-search">
           <div class="search-input-wrapper">
@@ -94,8 +82,10 @@
             <input type="text" id="area-search" placeholder="Search areas…"
                    autocomplete="off" spellcheck="false" aria-controls="island-list" />
             <button class="search-clear-btn" id="search-clear-btn"
-                    type="button" aria-label="Clear search">✕</button>
-            <span class="search-icon" aria-hidden="true">🔍</span>
+                    type="button" aria-label="Clear search">
+              <svg class="btn-icon" viewBox="0 0 256 256" aria-hidden="true"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg>
+            </button>
+            <svg class="search-icon" viewBox="0 0 256 256" aria-hidden="true"><path d="M232.49,215.51,185,168a92.12,92.12,0,1,0-17,17l47.53,47.54a12,12,0,0,0,17-17ZM44,112a68,68,0,1,1,68,68A68.07,68.07,0,0,1,44,112Z"/></svg>
           </div>
         </div>
         <div id="island-list" class="island-list" role="list"
@@ -104,17 +94,17 @@
         </div>
       </div>
 
-      <!-- ── INFO VIEW ──────────────────────────────────────── -->
+      <!-- INFO VIEW -->
       <div class="panel-view panel-view--info">
         <div id="info-content" class="info-content"></div>
       </div>
 
-    </aside><!-- /#panel -->
+    </aside>
 
-    <!-- Desktop panel-collapsed reveal tab -->
+    <!-- Desktop reveal tab -->
     <button class="panel-reveal-btn" id="panel-reveal-btn"
-            type="button" aria-label="Open areas panel" title="Open panel">
-      <span class="panel-reveal-btn__icon">›</span>
+            type="button" aria-label="Open panel" title="Open panel">
+      <svg class="btn-icon" viewBox="0 0 256 256" aria-hidden="true"><path d="M144.49,136.49l-80,80a12,12,0,0,1-17-17L119,128,47.51,56.49a12,12,0,0,1,17-17l80,80A12,12,0,0,1,144.49,136.49Zm80-17-80-80a12,12,0,1,0-17,17L199,128l-71.52,71.51a12,12,0,0,0,17,17l80-80A12,12,0,0,0,224.49,119.51Z"/></svg>
     </button>
 
     <!-- Share toast -->
