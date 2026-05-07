@@ -96,25 +96,23 @@
     about: [
       { keys: ['Designation_1','Designation_2','Designation_3'], label: 'Designation', format: 'join' },
       { key: 'Island',         label: 'Island' },
-      { key: 'Purpose',        label: 'Purpose',          format: 'bullet' },
-      { key: 'Cultural',       label: 'Cultural Info',    format: 'bullet' },
-      { key: 'Fishing_Info',   label: 'Fishing Info',     format: 'bullet' },
-      { key: 'Establish_Date', label: 'Date Established', format: 'date'   },
+      { key: 'Purpose',        label: 'Purpose'       },
+      { key: 'Cultural',       label: 'Cultural Info' },
+      { key: 'Fishing_Info',   label: 'Fishing Info'  },
+      { key: 'Establish_Date', label: 'Date Established', format: 'date' },
       { key: 'Location',       label: 'Location' },
       { key: 'DAR_URL',        label: 'Official DAR Page', format: 'link', linkText: 'Official DAR page ›' },
     ],
     sources: [
-      { key: 'HAR_Name', label: 'HAR Name' },
-      { key: 'HAR_Link', label: 'HAR Document', format: 'link', linkText: 'View HAR PDF ›' },
-      { key: 'HRS_Name', label: 'HRS Name' },
-      { key: 'HRS_Link', label: 'HRS Document', format: 'link', linkText: 'View HRS document ›' },
-      { key: 'Law_Other_Name_1', urlKey: 'Law_Other_URL_1', label: 'Other Law Reference', format: 'textLink', linkText: 'View reference ›' },
-      { key: 'Law_Other_Name_2', urlKey: 'Law_Other_URL_2', label: 'Other Law Reference', format: 'textLink', linkText: 'View reference ›' },
-      { key: 'State_Fishing_Regs_Text', urlKey: 'State_Fishing_Regs_URL', label: 'Statewide Fishing Regulations', format: 'textLink', linkText: 'View statewide regulations ›' },
-      { key: 'Rules_Also_Text', urlKey: 'Rules_Also_URL', label: 'Additional Rules', format: 'textLink', linkText: 'View additional rules ›' },
-      { key: 'Mgmt_Auth', label: 'Management Authority', format: 'bullet' },
-      { key: 'Enf_Auth',  label: 'Enforcement Authority', format: 'bullet' },
-      { key: 'Penalties', label: 'Penalties', format: 'bullet' },
+      { key: 'HAR_Name',  urlKey: 'HAR_Link',  label: 'Admin. Rules',          format: 'doclink', linkText: 'View HAR PDF ›'        },
+      { key: 'HRS_Name',  urlKey: 'HRS_Link',  label: 'State Statute',         format: 'doclink', linkText: 'View HRS document ›'   },
+      { key: 'Law_Other_Name_1', urlKey: 'Law_Other_URL_1', label: 'Other Law Reference', format: 'doclink', linkText: 'View reference ›' },
+      { key: 'Law_Other_Name_2', urlKey: 'Law_Other_URL_2', label: 'Other Law Reference', format: 'doclink', linkText: 'View reference ›' },
+      { key: 'State_Fishing_Regs_Text', urlKey: 'State_Fishing_Regs_URL', label: 'Statewide Fishing Regs', format: 'doclink', linkText: 'View statewide regulations ›' },
+      { key: 'Rules_Also_Text', urlKey: 'Rules_Also_URL', label: 'Additional Rules', format: 'doclink', linkText: 'View additional rules ›' },
+      { key: 'Mgmt_Auth', label: 'Management Authority',  format: 'rules' },
+      { key: 'Enf_Auth',  label: 'Enforcement Authority', format: 'rules' },
+      { key: 'Penalties', label: 'Penalties',              format: 'rules' },
     ],
   };
 
@@ -199,15 +197,6 @@
       .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
       .replace(/[ʻ\u02BB\u02BC'''`]/g,'')
       .replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
-  }
-
-  function formatBulletsWithIndents(text) {
-    if (!text || text === 'N/A') return 'N/A';
-    return String(text).split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
-      .map((l) => `<div class="mm-bullet-container">
-        <span class="mm-bullet-point">•</span>
-        <span class="mm-bullet-text">${escapeHtml(l.replace(/^[•●○◦*-]\s+/,'').trim())}</span>
-      </div>`).join('');
   }
 
   function getAreaImages(feature) {
@@ -658,23 +647,40 @@
       : getVal(props, entry.key);
     if (!value) return '';
 
+    // 'link' — standalone full-width button link (DAR page etc.)
     if (entry.format === 'link') {
       const url = getSafeUrl(value);
       return url ? `<a class="reg-link" href="${url}" target="_blank" rel="noopener">${entry.linkText || url}</a>` : '';
     }
-    if (entry.format === 'textLink') {
-      const textVal = getVal(props, entry.key);
-      const url     = getSafeUrl(getVal(props, entry.urlKey));
-      if (!textVal && !url) return '';
-      return (textVal ? `<div class="field-block"><div class="field-block__label">${entry.label}</div><div>${escapeHtml(textVal)}</div></div>` : '')
-           + (url ? `<a class="reg-link" href="${url}" target="_blank" rel="noopener">${entry.linkText || url}</a>` : '');
+
+    // 'doclink' — citation name + lightweight inline link on same field-block
+    if (entry.format === 'doclink') {
+      const name = getVal(props, entry.key);
+      const url  = getSafeUrl(getVal(props, entry.urlKey));
+      if (!name && !url) return '';
+      const linkHtml = url
+        ? `<a class="doc-link" href="${url}" target="_blank" rel="noopener">${entry.linkText || url}</a>`
+        : '';
+      return `<div class="field-block">
+        <div class="field-block__label">${entry.label}</div>
+        <div class="field-block__doc">${name ? escapeHtml(name) : ''}${linkHtml}</div>
+      </div>`;
+    }
+
+    // 'rules' — rendered via renderRuleLines into a rule-item-list
+    if (entry.format === 'rules') {
+      const items = renderRuleLines(String(value));
+      if (!items) return '';
+      return `<div class="field-block">
+        <div class="field-block__label">${entry.label}</div>
+        <ul class="rule-item-list">${items}</ul>
+      </div>`;
     }
 
     const display =
-      entry.format === 'join'   ? value.map((v) => escapeHtml(v)).join('<br>')
-    : entry.format === 'bullet' ? formatBulletsWithIndents(value)
-    : entry.format === 'date'   ? formatDate(value)
-    :                             escapeHtml(value);
+      entry.format === 'join' ? value.map((v) => escapeHtml(v)).join('<br>')
+    : entry.format === 'date' ? formatDate(value)
+    :                           escapeHtml(value);
 
     return `<div class="field-block"><div class="field-block__label">${entry.label}</div><div>${display}</div></div>`;
   }
@@ -846,7 +852,7 @@
 
   function buildSummaryPanel(features) {
     const summary = buildCombinedRulesSummary(features);
-    return `<div class="mmcard mmcard--summary overlap-summary-card" data-summary-card>
+    return `<div class="mmcard mmcard--summary" data-summary-card>
       ${renderSummaryHeader(features.length)}
       <div class="summary-body" data-summary-body>
         ${renderSummaryLegend(summary.sources)}
