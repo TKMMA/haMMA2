@@ -685,13 +685,26 @@
   }
 
   // ── Rules rendering ──────────────────────────────────────────
+  // Render rule text lines into <li> elements.
+  // Lines starting with '- ' or '• ' are true bullet items.
+  // Lines without that prefix are prose/qualifier lines (e.g. "All fishing gear except:")
+  // rendered without a disc bullet so they read as a header for the sub-items below.
+  function renderRuleLines(text) {
+    return text.trim().split('\n').filter(Boolean).map((line) => {
+      const isBullet = /^[-•]\s/.test(line);
+      const clean    = line.replace(/^[-•]\s*/, '').trim();
+      if (!clean) return '';
+      return isBullet
+        ? `<li class="rule-item">${escapeHtml(clean)}</li>`
+        : `<li class="rule-item rule-item--prose">${escapeHtml(clean)}</li>`;
+    }).join('');
+  }
+
   function renderRuleStatusBlock(statusKey, text) {
     if (!text?.trim()) return '';
     const status = RULE_STATUS[statusKey];
     if (!status) return '';
-    const items = text.trim().split('\n').filter(Boolean)
-      .map((l) => { const c = l.replace(/^[-•]\s*/,'').trim(); return c ? `<li class="rule-item">${escapeHtml(c)}</li>` : ''; })
-      .join('');
+    const items = renderRuleLines(text);
     return `<div class="rule-status-block ${status.cls}">
       <div class="rule-status-block__header">${status.label}</div>
       <ul class="rule-item-list">${items}</ul>
@@ -783,11 +796,7 @@
         ? multi.map((s) => renderSourceChip(s)).join('')
         : renderSourceChip(source);
 
-      const items = text.split('\n').filter(Boolean)
-        .map((line) => {
-          const clean = line.replace(/^[-•]\s*/,'').trim();
-          return clean ? `<li class="rule-item">${escapeHtml(clean)}</li>` : '';
-        }).join('');
+      const items = renderRuleLines(text);
 
       return `<div class="summary-field-entry"><div class="summary-entry-chips">${chipHtml}</div><ul class="rule-item-list">${items}</ul></div>`;
     }).join('');
