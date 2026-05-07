@@ -685,18 +685,21 @@
   }
 
   // ── Rules rendering ──────────────────────────────────────────
-  // Render rule text lines into <li> elements.
-  // Lines starting with '- ' or '• ' are true bullet items.
-  // Lines without that prefix are prose/qualifier lines (e.g. "All fishing gear except:")
-  // rendered without a disc bullet so they read as a header for the sub-items below.
+  // Render rule text lines into <li> elements. Three levels:
+  //   '- text'    → top-level bullet (disc)
+  //   '  - text'  → indented sub-bullet (secondary color, indented)
+  //   'text'      → prose qualifier (italic, no bullet — e.g. "All fishing gear except:")
   function renderRuleLines(text) {
     return text.trim().split('\n').filter(Boolean).map((line) => {
-      const isBullet = /^[-•]\s/.test(line);
-      const clean    = line.replace(/^[-•]\s*/, '').trim();
+      const isIndented = /^\s+[-•]\s/.test(line);
+      const isBullet   = /^[-•]\s/.test(line);
+      const clean      = line.replace(/^\s*[-•]\s*/, '').trim();
       if (!clean) return '';
-      return isBullet
-        ? `<li class="rule-item">${escapeHtml(clean)}</li>`
-        : `<li class="rule-item rule-item--prose">${escapeHtml(clean)}</li>`;
+      if (isIndented)
+        return `<li class="rule-item rule-item--sub">${escapeHtml(clean)}</li>`;
+      if (isBullet)
+        return `<li class="rule-item">${escapeHtml(clean)}</li>`;
+      return `<li class="rule-item rule-item--prose">${escapeHtml(clean)}</li>`;
     }).join('');
   }
 
