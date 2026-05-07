@@ -103,7 +103,7 @@
       { key: 'Location',       label: 'Location' },
       { key: 'DAR_URL',        label: 'Official DAR Page', format: 'link', linkText: 'Official DAR page ›' },
     ],
-    laws: [
+    sources: [
       { key: 'HAR_Name', label: 'HAR Name' },
       { key: 'HAR_Link', label: 'HAR Document', format: 'link', linkText: 'View HAR PDF ›' },
       { key: 'HRS_Name', label: 'HRS Name' },
@@ -903,7 +903,7 @@
         </div>
         <div id="about-${uid}"   class="tab-pane field-stack" hidden>${renderTab('about',props)}</div>
         <div id="rules-${uid}"   class="tab-pane field-stack">${renderRulesTab(props)}</div>
-        <div id="sources-${uid}" class="tab-pane field-stack" hidden>${renderTab('laws',props)}</div>
+        <div id="sources-${uid}" class="tab-pane field-stack" hidden>${renderTab('sources',props)}</div>
       </div>
     </div>`;
   }
